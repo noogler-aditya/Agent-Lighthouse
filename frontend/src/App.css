@@ -1,0 +1,176 @@
+/* App-specific styles */
+
+/* Header */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.trace-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.header-stats {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.header-stat {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.header-stat strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Right Panel */
+.right-panel-tabs {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.right-panel-content {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Span Modal */
+.span-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn var(--transition-fast);
+}
+
+.span-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-xl);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn var(--transition-normal);
+}
+
+.span-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.span-modal-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.close-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.span-modal-content {
+  padding: var(--space-lg);
+  overflow-y: auto;
+}
+
+.span-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.span-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.span-detail label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.span-detail span {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.span-data-section {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.span-data-section h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+}
+
+.span-data-section pre {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.span-data-section.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--accent-error);
+}
+
+.span-data-section.error h4 {
+  color: var(--accent-error);
+}
+
+.span-data-section.error pre {
+  color: var(--accent-error);
+}

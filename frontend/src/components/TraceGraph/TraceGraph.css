@@ -1,0 +1,209 @@
+/* Node base styles */
+.agent-node,
+.tool-node,
+.llm-node {
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    min-width: 180px;
+    transition: all var(--transition-fast);
+}
+
+.agent-node:hover,
+.tool-node:hover,
+.llm-node:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+/* Node types */
+.agent-node {
+    border-color: var(--accent-primary);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, var(--bg-tertiary) 100%);
+}
+
+.tool-node {
+    border-color: var(--accent-success);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, var(--bg-tertiary) 100%);
+}
+
+.llm-node {
+    border-color: var(--accent-secondary);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, var(--bg-tertiary) 100%);
+}
+
+/* Status classes */
+.status-running {
+    animation: pulse-border 2s infinite;
+}
+
+.status-success {
+    border-color: var(--accent-success);
+}
+
+.status-error {
+    border-color: var(--accent-error);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, var(--bg-tertiary) 100%);
+}
+
+@keyframes pulse-border {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(99, 102, 241, 0);
+    }
+}
+
+/* Node header */
+.node-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.node-icon {
+    font-size: 18px;
+}
+
+.node-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+
+.node-model {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: var(--space-sm);
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    display: inline-block;
+}
+
+/* Node metrics */
+.node-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--border-primary);
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 45px;
+}
+
+.metric-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.metric-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Node error */
+.node-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: var(--radius-sm);
+    margin-top: var(--space-sm);
+}
+
+.error-icon {
+    font-size: 12px;
+}
+
+.error-text {
+    font-size: 11px;
+    color: var(--accent-error);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+/* React Flow handles */
+.react-flow__handle {
+    width: 10px;
+    height: 10px;
+    background: var(--accent-primary);
+    border: 2px solid var(--bg-secondary);
+}
+
+.react-flow__handle-top {
+    top: -5px;
+}
+
+.react-flow__handle-bottom {
+    bottom: -5px;
+}
+
+/* Edges */
+.react-flow__edge-path {
+    stroke: var(--border-secondary);
+    stroke-width: 2;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+    stroke: var(--accent-primary);
+    animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: -10;
+    }
+}
+
+/* Graph container */
+.trace-graph-container {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary);
+}
+
+.trace-graph-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    gap: var(--space-md);
+}
+
+.trace-graph-empty .empty-icon {
+    font-size: 48px;
+    opacity: 0.5;
+}
+
+.trace-graph-empty .empty-text {
+    font-size: 16px;
+}
+
+.trace-graph-empty .empty-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+}

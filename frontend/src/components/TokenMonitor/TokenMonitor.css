@@ -1,0 +1,115 @@
+.token-monitor {
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    overflow-y: auto;
+}
+
+.token-monitor.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.empty-text {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* Metrics Summary */
+.metrics-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+}
+
+.metric-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+}
+
+.metric-icon {
+    font-size: 20px;
+}
+
+.metric-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.metric-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* Chart Sections */
+.chart-section {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+}
+
+.section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-md);
+}
+
+.chart-container {
+    width: 100%;
+}
+
+/* Burn Rate */
+.burn-rate {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, var(--bg-tertiary) 100%);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    text-align: center;
+}
+
+.burn-rate-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: var(--space-xs);
+}
+
+.burn-rate-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent-primary);
+}
+
+.burn-rate-cost {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: var(--space-xs);
+}
+
+/* Recharts overrides */
+.recharts-text {
+    fill: var(--text-secondary);
+    font-size: 11px;
+}
+
+.recharts-pie-label-text {
+    fill: var(--text-primary);
+    font-size: 10px;
+}

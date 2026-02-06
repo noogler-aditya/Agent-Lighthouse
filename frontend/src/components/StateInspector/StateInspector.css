@@ -1,0 +1,149 @@
+.state-inspector {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.state-inspector.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-text {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* Control Panel */
+.control-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.control-status {
+    display: flex;
+    align-items: center;
+}
+
+.control-buttons {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+/* State Tabs */
+.state-tabs {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+/* State Content */
+.state-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.loading,
+.no-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    gap: var(--space-sm);
+}
+
+.no-state .hint {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.json-viewer {
+    height: 100%;
+    overflow: auto;
+    padding: var(--space-md);
+}
+
+.json-viewer pre {
+    margin: 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.editor-container {
+    height: 100%;
+}
+
+/* State Actions */
+.state-actions {
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-primary);
+}
+
+.state-actions .btn {
+    flex: 1;
+}
+
+/* Snapshots Section */
+.snapshots-section {
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-primary);
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+}
+
+.snapshots-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.snapshot-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+}
+
+.snapshot-index {
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.snapshot-time {
+    color: var(--text-secondary);
+}
+
+.snapshot-desc {
+    color: var(--text-muted);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
