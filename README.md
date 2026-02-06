@@ -1,0 +1,335 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/🔦-Agent%20Lighthouse-6366f1?style=for-the-badge" alt="Agent Lighthouse"/>
+</p>
+
+<h1 align="center">Agent Lighthouse</h1>
+
+<p align="center">
+  <strong>Multi-Agent Observability Dashboard</strong><br>
+  A framework-agnostic visual debugger for agentic AI systems
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.9+-3776ab?logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/react-18+-61dafb?logo=react&logoColor=black" alt="React"/>
+  <img src="https://img.shields.io/badge/fastapi-0.109+-009688?logo=fastapi&logoColor=white" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/redis-7+-dc382d?logo=redis&logoColor=white" alt="Redis"/>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License"/>
+</p>
+
+---
+
+## 🎯 The Problem
+
+When running multi-agent systems (CrewAI, LangGraph, AutoGen, etc.), debugging is a nightmare:
+
+| Challenge | Impact |
+|-----------|--------|
+| **Black Box Execution** | Can't see what's happening inside agent loops |
+| **Opaque Failures** | If it fails at step 10, which agent caused it? |
+| **Hidden Costs** | Token usage spirals without visibility |
+| **No State Inspection** | Can't pause and inspect agent memory |
+| **Log Analysis Hell** | Debugging requires parsing walls of text |
+
+## ✨ The Solution
+
+Agent Lighthouse provides a **visual debugging layer** for any multi-agent system:
+
+```
+Your Agent Code → Lighthouse SDK → Visual Dashboard
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| 🔍 **Trace Visualization** | Interactive flowchart showing agent execution |
+| 💰 **Token Burn-Rate Monitor** | Real-time tracking of costs per agent/tool |
+| 🔧 **State Inspection** | Pause, inspect memory as JSON, edit, and resume |
+| ⚡ **Real-Time Updates** | WebSocket-powered live updates |
+| 🔌 **Framework Agnostic** | Works with CrewAI, LangGraph, AutoGen, or custom agents |
+
+---
+
+## 🖥️ Dashboard Preview
+
+<p align="center">
+  <img src="docs/dashboard-preview.png" alt="Agent Lighthouse Dashboard" width="800"/>
+</p>
+
+**Dashboard Components:**
+- **Sidebar**: Searchable list of all traces with quick stats
+- **Trace Graph**: React Flow visualization with Agent, Tool, and LLM nodes
+- **Token Monitor**: Pie/bar charts showing cost distribution
+- **State Inspector**: Monaco editor for viewing/editing agent state
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.9+
+- Node.js 18+
+- Redis (or Docker)
+
+### Option 1: Docker Compose (Recommended)
+
+```bash
+git clone https://github.com/noogler-aditya/Agent-Lighthouse.git
+cd Agent-Lighthouse
+
+docker-compose up -d
+```
+
+### Option 2: Manual Setup
+
+```bash
+# 1. Start Redis
+docker run -d -p 6379:6379 redis:7-alpine
+
+# 2. Start Backend
+cd backend
+pip install -r requirements.txt
+python3 -m uvicorn main:app --reload --port 8000
+
+# 3. Start Frontend (new terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+### Access Points
+
+| Service | URL |
+|---------|-----|
+| **Dashboard** | http://localhost:5173 |
+| **API Docs** | http://localhost:8000/docs |
+| **WebSocket** | ws://localhost:8000/ws |
+
+---
+
+## 📦 SDK Installation
+
+```bash
+pip install agent-lighthouse
+```
+
+Or install from source:
+```bash
+cd sdk
+pip install -e .
+```
+
+---
+
+## 🛠️ Usage
+
+### Basic Tracing
+
+```python
+from agent_lighthouse import LighthouseTracer
+
+tracer = LighthouseTracer()
+
+with tracer.trace("My Agent Workflow"):
+    with tracer.span("Research Agent", kind="agent"):
+        result = research(query)
+    
+    with tracer.span("Writer Agent", kind="agent"):
+        content = write(result)
+```
+
+### Decorator-Based (Recommended)
+
+```python
+from agent_lighthouse import trace_agent, trace_tool, trace_llm, get_tracer
+
+@trace_tool("Web Search")
+def search_web(query: str) -> list:
+    return requests.get(f"https://api.search.com?q={query}").json()
+
+@trace_llm("GPT-4", model="gpt-4", cost_per_1k_prompt=0.03)
+def call_gpt4(prompt: str):
+    return openai.chat.completions.create(...)
+
+@trace_agent("Research Agent")
+def research_agent(topic: str):
+    results = search_web(topic)
+    analysis = call_gpt4(f"Analyze: {results}")
+    return analysis
+
+# Run with tracing
+tracer = get_tracer()
+with tracer.trace("Research Workflow"):
+    research_agent("AI Trends 2024")
+```
+
+### State Inspection
+
+```python
+@trace_agent("Writer Agent")
+def writer_agent(research):
+    tracer = get_tracer()
+    
+    # Expose state for dashboard inspection
+    tracer.update_state(
+        memory={"research": research, "draft_count": 0},
+        context={"agent": "writer"},
+        variables={"temperature": 0.7}
+    )
+    
+    draft = generate_draft(research)
+    return draft
+```
+
+Pause from the dashboard to:
+1. View current state as JSON
+2. Edit memory/context/variables
+3. Resume execution with modified state
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Your Agent Code   │────▶│  Lighthouse SDK  │────▶│  FastAPI Backend│
+│  (CrewAI/LangGraph) │     │ (trace_agent,etc)│     │   (Port 8000)   │
+└─────────────────────┘     └──────────────────┘     └────────┬────────┘
+                                                              │
+                                                              ▼
+                            ┌──────────────────┐     ┌─────────────────┐
+                            │  React Dashboard │◀────│      Redis      │
+                            │   (Port 5173)    │     │  (Port 6379)    │
+                            └──────────────────┘     └─────────────────┘
+```
+
+---
+
+## 📁 Project Structure
+
+```
+Agent-Lighthouse/
+├── backend/                    # FastAPI Backend
+│   ├── main.py                # Application entry point
+│   ├── models/                # Pydantic data models
+│   │   ├── trace.py          # Trace & Span models
+│   │   ├── agent.py          # Agent model
+│   │   ├── state.py          # State & Control models
+│   │   └── metrics.py        # Token metrics models
+│   ├── routers/               # API endpoints
+│   │   ├── traces.py         # Trace CRUD operations
+│   │   ├── agents.py         # Agent registration
+│   │   ├── state.py          # State inspection/control
+│   │   └── websocket.py      # Real-time updates
+│   └── services/              # Business logic
+│       ├── redis_service.py  # Data persistence
+│       └── connection_manager.py  # WebSocket management
+│
+├── frontend/                   # React Dashboard
+│   └── src/
+│       ├── components/
+│       │   ├── TraceGraph/   # React Flow visualization
+│       │   ├── TokenMonitor/ # Recharts cost display
+│       │   ├── StateInspector/ # Monaco JSON editor
+│       │   └── Sidebar/      # Trace list
+│       └── hooks/             # Custom React hooks
+│           ├── useWebSocket.js
+│           ├── useTraces.js
+│           └── useAgentState.js
+│
+├── sdk/                        # Python SDK
+│   └── agent_lighthouse/
+│       ├── tracer.py         # LighthouseTracer class
+│       ├── client.py         # HTTP client
+│       └── examples/         # Usage examples
+│
+├── docker-compose.yml          # Full stack deployment
+└── README.md
+```
+
+---
+
+## 🔌 API Reference
+
+### Traces
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/traces` | GET | List all traces |
+| `/api/traces` | POST | Create new trace |
+| `/api/traces/{id}` | GET | Get trace by ID |
+| `/api/traces/{id}/tree` | GET | Get trace as tree |
+| `/api/traces/{id}/spans` | POST | Add span to trace |
+
+### State Control
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/state/{id}` | GET | Get agent state |
+| `/api/state/{id}` | PUT | Update state |
+| `/api/state/{id}/pause` | POST | Pause execution |
+| `/api/state/{id}/resume` | POST | Resume execution |
+| `/api/state/{id}/step` | POST | Step execution |
+
+### WebSocket
+
+Connect to `/ws` for real-time updates:
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws');
+ws.send(JSON.stringify({ action: 'subscribe', trace_id: 'xxx' }));
+```
+
+---
+
+## 🧪 Run Demo
+
+```bash
+cd sdk
+pip install -e .
+python examples/demo_multi_agent.py
+```
+
+This creates a sample workflow with Research, Writer, and Editor agents visible in the dashboard.
+
+---
+
+## 🛣️ Roadmap
+
+- [ ] **CrewAI Integration** - Auto-instrumentation for CrewAI
+- [ ] **LangGraph Integration** - Auto-instrumentation for LangGraph
+- [ ] **Breakpoints** - Set breakpoints on specific agent/tool calls
+- [ ] **Time-Travel Debugging** - Replay execution from snapshots
+- [ ] **Cost Alerts** - Notifications when burn rate exceeds threshold
+- [ ] **Export/Import** - Save and share trace data
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) first.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  <strong>Built with ❤️ for the AI Agent Community</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/noogler-aditya/Agent-Lighthouse">⭐ Star this repo</a> •
+  <a href="https://github.com/noogler-aditya/Agent-Lighthouse/issues">🐛 Report Bug</a> •
+  <a href="https://github.com/noogler-aditya/Agent-Lighthouse/issues">💡 Request Feature</a>
+</p>
