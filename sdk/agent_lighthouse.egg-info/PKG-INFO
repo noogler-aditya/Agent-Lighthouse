@@ -1,0 +1,31 @@
+Metadata-Version: 2.4
+Name: agent-lighthouse
+Version: 0.1.0
+Summary: Multi-Agent Observability SDK for Agent Lighthouse
+Author-email: Agent Lighthouse <lighthouse@example.com>
+License: MIT
+Project-URL: Homepage, https://github.com/example/agent-lighthouse
+Project-URL: Documentation, https://agent-lighthouse.dev
+Project-URL: Repository, https://github.com/example/agent-lighthouse
+Keywords: agents,multi-agent,observability,tracing,debugging
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: httpx>=0.25.0
+Requires-Dist: websockets>=12.0
+Requires-Dist: opentelemetry-api>=1.20.0
+Requires-Dist: opentelemetry-sdk>=1.20.0
+Requires-Dist: pydantic>=2.0.0
+Provides-Extra: crewai
+Requires-Dist: crewai>=0.1.0; extra == "crewai"
+Provides-Extra: langgraph
+Requires-Dist: langgraph>=0.0.1; extra == "langgraph"
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
