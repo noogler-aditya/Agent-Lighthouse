@@ -173,8 +173,8 @@ This repo now includes GitHub Actions workflows for open-source style quality ga
 - **CD** (`.github/workflows/cd.yml`)
   - Runs on merge/push to `main`
   - Builds and publishes Docker images to GHCR:
-    - `ghcr.io/<owner>/<repo>/backend:latest`
-    - `ghcr.io/<owner>/<repo>/frontend:latest`
+    - `ghcr.io/<noogler-aditya>/<repo>/backend:latest`
+    - `ghcr.io/<noogler-aditya>/<repo>/frontend:latest`
     - plus immutable `sha-<commit>` tags
 
 ### Recommended Repository Settings
