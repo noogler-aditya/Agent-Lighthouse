@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 import uuid
+import copy
 
 
 class ExecutionStatus(str, Enum):
@@ -121,10 +122,10 @@ class AgentState(BaseModel):
             agent_id=self.current_agent_id,
             description=description,
             state_data={
-                "memory": self.memory.copy(),
-                "context": self.context.copy(),
-                "variables": self.variables.copy(),
-                "messages": self.messages.copy(),
+                "memory": copy.deepcopy(self.memory),
+                "context": copy.deepcopy(self.context),
+                "variables": copy.deepcopy(self.variables),
+                "messages": copy.deepcopy(self.messages),
             }
         )
         self.snapshots.append(snapshot)
@@ -168,6 +169,8 @@ class AgentState(BaseModel):
         for key in key_path[:-1]:
             if key not in container:
                 container[key] = {}
+            if not isinstance(container[key], dict):
+                return False
             container = container[key]
         
         # Set the value

@@ -1,7 +1,6 @@
 """
 WebSocket connection manager for real-time updates
 """
-import json
 from typing import Any, Optional
 from fastapi import WebSocket
 
@@ -59,7 +58,7 @@ class ConnectionManager:
     async def broadcast(self, message: dict[str, Any]):
         """Broadcast a message to all connections"""
         disconnected = []
-        for connection in self.active_connections:
+        for connection in list(self.active_connections):
             try:
                 await connection.send_json(message)
             except Exception:
@@ -75,7 +74,7 @@ class ConnectionManager:
             return
         
         disconnected = []
-        for connection in self.trace_subscriptions[trace_id]:
+        for connection in list(self.trace_subscriptions[trace_id]):
             try:
                 await connection.send_json(message)
             except Exception:
@@ -100,8 +99,6 @@ class ConnectionManager:
             "data": data,
         }
         await self.broadcast_to_trace(trace_id, message)
-        # Also broadcast to global listeners
-        await self.broadcast(message)
     
     async def broadcast_metrics_update(self, trace_id: str, metrics: dict[str, Any]):
         """Broadcast metrics update"""
@@ -111,7 +108,6 @@ class ConnectionManager:
             "metrics": metrics,
         }
         await self.broadcast_to_trace(trace_id, message)
-        await self.broadcast(message)
     
     async def broadcast_state_change(
         self,

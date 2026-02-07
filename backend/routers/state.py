@@ -3,26 +3,28 @@ State inspection and execution control API router
 """
 from typing import Optional, Any
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from models.state import AgentState, ExecutionControl, ExecutionStatus, StateSnapshot
+from dependencies import get_connection_manager, get_redis
+from models.state import AgentState, ExecutionControl
+from security import require_api_key
+from services.connection_manager import ConnectionManager
 from services.redis_service import RedisService
 
 
-router = APIRouter(prefix="/api/state", tags=["state"])
-
-
-async def get_redis() -> RedisService:
-    from main import redis_service
-    return redis_service
+router = APIRouter(
+    prefix="/api/state",
+    tags=["state"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 # ============ REQUEST MODELS ============
 
 class InitStateRequest(BaseModel):
-    memory: dict = {}
-    context: dict = {}
-    variables: dict = {}
+    memory: dict = Field(default_factory=dict)
+    context: dict = Field(default_factory=dict)
+    variables: dict = Field(default_factory=dict)
 
 
 class ModifyStateRequest(BaseModel):
@@ -37,12 +39,18 @@ class BulkModifyStateRequest(BaseModel):
 
 
 class StepRequest(BaseModel):
-    count: int = 1
+    count: int = Field(default=1, ge=1, le=1000)
 
 
 class BreakpointRequest(BaseModel):
-    span_ids: list[str] = []
-    agent_ids: list[str] = []
+    span_ids: list[str] = Field(default_factory=list)
+    agent_ids: list[str] = Field(default_factory=list)
+
+
+async def _ensure_trace_exists(trace_id: str, redis: RedisService):
+    trace = await redis.get_trace(trace_id)
+    if not trace:
+        raise HTTPException(status_code=404, detail="Trace not found")
 
 
 # ============ ENDPOINTS ============
@@ -86,7 +94,8 @@ async def initialize_state(
 async def modify_state(
     trace_id: str,
     request: ModifyStateRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """Modify a specific path in the state"""
     state = await redis.get_state(trace_id)
@@ -100,7 +109,6 @@ async def modify_state(
     await redis.save_state(state)
     
     # Broadcast state change
-    from main import connection_manager
     await connection_manager.broadcast_state_change(
         trace_id=trace_id,
         control_status=state.control.status.value,
@@ -118,7 +126,8 @@ async def modify_state(
 async def bulk_modify_state(
     trace_id: str,
     request: BulkModifyStateRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """Bulk modify state containers"""
     state = await redis.get_state(trace_id)
@@ -135,7 +144,6 @@ async def bulk_modify_state(
     await redis.save_state(state)
     
     # Broadcast state change
-    from main import connection_manager
     await connection_manager.broadcast_state_change(
         trace_id=trace_id,
         control_status=state.control.status.value,
@@ -155,9 +163,11 @@ async def bulk_modify_state(
 async def pause_execution(
     trace_id: str,
     span_id: Optional[str] = None,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """Pause execution at the current point"""
+    await _ensure_trace_exists(trace_id, redis)
     state = await redis.get_state(trace_id)
     if not state:
         # Create state if it doesn't exist
@@ -170,7 +180,6 @@ async def pause_execution(
     await redis.save_state(state)
     
     # Broadcast pause event
-    from main import connection_manager
     await connection_manager.broadcast_state_change(
         trace_id=trace_id,
         control_status="paused"
@@ -182,7 +191,8 @@ async def pause_execution(
 @router.post("/{trace_id}/resume")
 async def resume_execution(
     trace_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """Resume paused execution"""
     state = await redis.get_state(trace_id)
@@ -193,7 +203,6 @@ async def resume_execution(
     await redis.save_state(state)
     
     # Broadcast resume event
-    from main import connection_manager
     await connection_manager.broadcast_state_change(
         trace_id=trace_id,
         control_status="running"
@@ -206,7 +215,8 @@ async def resume_execution(
 async def step_execution(
     trace_id: str,
     request: StepRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """Execute N steps then pause"""
     state = await redis.get_state(trace_id)
@@ -215,7 +225,12 @@ async def step_execution(
     
     state.control.step(request.count)
     await redis.save_state(state)
-    
+
+    await connection_manager.broadcast_state_change(
+        trace_id=trace_id,
+        control_status="step",
+    )
+
     return {"message": f"Stepping {request.count} step(s)", "status": "step"}
 
 
@@ -247,6 +262,7 @@ async def set_breakpoints(
     redis: RedisService = Depends(get_redis)
 ):
     """Set breakpoints for debugging"""
+    await _ensure_trace_exists(trace_id, redis)
     state = await redis.get_state(trace_id)
     if not state:
         state = AgentState(
@@ -302,7 +318,8 @@ async def list_snapshots(
 async def restore_snapshot(
     trace_id: str,
     snapshot_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """Restore state from a snapshot"""
     state = await redis.get_state(trace_id)
@@ -316,7 +333,6 @@ async def restore_snapshot(
     await redis.save_state(state)
     
     # Broadcast state change
-    from main import connection_manager
     await connection_manager.broadcast_state_change(
         trace_id=trace_id,
         control_status=state.control.status.value,

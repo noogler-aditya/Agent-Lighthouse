@@ -3,7 +3,7 @@ Redis service for trace and state persistence
 """
 import json
 from typing import Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 import redis.asyncio as redis
 from models.trace import Trace, Span
 from models.agent import Agent
@@ -29,14 +29,15 @@ class RedisService:
     SPAN_CHANNEL = "lighthouse:events:spans"
     STATE_CHANNEL = "lighthouse:events:state"
     
-    def __init__(self, redis_url: str = "redis://localhost:6379"):
+    def __init__(self, redis_url: str = "redis://localhost:6379", trace_ttl_hours: int = 24):
         self.redis_url = redis_url
+        self.trace_ttl_hours = trace_ttl_hours
         self.redis: Optional[redis.Redis] = None
         self.pubsub: Optional[redis.client.PubSub] = None
     
     async def connect(self):
         """Connect to Redis"""
-        self.redis = await redis.from_url(
+        self.redis = redis.from_url(
             self.redis_url,
             encoding="utf-8",
             decode_responses=True
@@ -46,17 +47,24 @@ class RedisService:
     async def disconnect(self):
         """Disconnect from Redis"""
         if self.pubsub:
-            await self.pubsub.close()
+            await self.pubsub.aclose()
         if self.redis:
-            await self.redis.close()
+            await self.redis.aclose()
     
     # ============ TRACE OPERATIONS ============
     
-    async def save_trace(self, trace: Trace, ttl_hours: int = 24) -> bool:
+    async def save_trace(
+        self,
+        trace: Trace,
+        ttl_hours: Optional[int] = None,
+        event_type: Optional[str] = None,
+    ) -> bool:
         """Save a trace to Redis"""
         key = f"{self.TRACE_PREFIX}{trace.trace_id}"
         data = trace.model_dump_json()
-        await self.redis.set(key, data, ex=ttl_hours * 3600)
+        exists = await self.redis.exists(key)
+        ttl_seconds = (ttl_hours or self.trace_ttl_hours) * 3600
+        await self.redis.set(key, data, ex=ttl_seconds)
         
         # Add to traces list (sorted by start time)
         await self.redis.zadd(
@@ -64,9 +72,12 @@ class RedisService:
             {trace.trace_id: trace.start_time.timestamp()}
         )
         
+        if event_type is None:
+            event_type = "trace_updated" if exists else "trace_created"
+
         # Publish event
         await self.publish_event(self.TRACE_CHANNEL, {
-            "type": "trace_created",
+            "type": event_type,
             "trace_id": trace.trace_id,
             "name": trace.name,
             "status": trace.status.value
@@ -104,6 +115,19 @@ class RedisService:
                     traces.append(trace)
         
         return traces
+
+    async def count_traces(self, status: Optional[str] = None) -> int:
+        """Get total count of traces, optionally filtered by status."""
+        if status is None:
+            return await self.redis.zcard(f"{self.TRACE_PREFIX}list")
+
+        trace_ids = await self.redis.zrange(f"{self.TRACE_PREFIX}list", 0, -1)
+        count = 0
+        for trace_id in trace_ids:
+            trace = await self.get_trace(trace_id)
+            if trace and trace.status.value == status:
+                count += 1
+        return count
     
     async def update_trace(self, trace: Trace) -> bool:
         """Update an existing trace"""
@@ -111,16 +135,7 @@ class RedisService:
         exists = await self.redis.exists(key)
         if not exists:
             return False
-        
-        await self.redis.set(key, trace.model_dump_json())
-        
-        # Publish update event
-        await self.publish_event(self.TRACE_CHANNEL, {
-            "type": "trace_updated",
-            "trace_id": trace.trace_id,
-            "status": trace.status.value
-        })
-        
+        await self.save_trace(trace, event_type="trace_updated")
         return True
     
     async def delete_trace(self, trace_id: str) -> bool:
@@ -143,7 +158,7 @@ class RedisService:
             return False
         
         trace.add_span(span)
-        await self.save_trace(trace)
+        await self.save_trace(trace, event_type="trace_updated")
         
         # Publish span event
         await self.publish_event(self.SPAN_CHANNEL, {
@@ -163,13 +178,19 @@ class RedisService:
         trace = await self.get_trace(trace_id)
         if not trace:
             return False
-        
+
+        found = False
         for i, s in enumerate(trace.spans):
             if s.span_id == span.span_id:
                 trace.spans[i] = span
+                found = True
                 break
-        
-        await self.save_trace(trace)
+
+        if not found:
+            return False
+
+        trace.recalculate_aggregates()
+        await self.save_trace(trace, event_type="trace_updated")
         
         # Publish update event
         await self.publish_event(self.SPAN_CHANNEL, {
@@ -213,6 +234,7 @@ class RedisService:
     async def save_state(self, state: AgentState) -> bool:
         """Save agent state"""
         key = f"{self.STATE_PREFIX}{state.trace_id}"
+        state.last_updated = datetime.utcnow()
         await self.redis.set(key, state.model_dump_json())
         
         # Publish state update

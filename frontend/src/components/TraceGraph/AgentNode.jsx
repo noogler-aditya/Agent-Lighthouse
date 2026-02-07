@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
+import { Bot } from '../icons/AppIcons';
 import './TraceGraph.css';
 
 const AgentNode = memo(({ data }) => {
@@ -19,7 +20,7 @@ const AgentNode = memo(({ data }) => {
             <Handle type="target" position={Position.Top} />
 
             <div className="node-header">
-                <div className="node-icon agent-icon">🤖</div>
+                <Bot className="ui-icon node-icon agent-icon" />
                 <div className="node-title">{name}</div>
             </div>
 

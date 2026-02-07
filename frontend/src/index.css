@@ -71,6 +71,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.ui-icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+
+.ui-icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.ui-icon-xs {
+  width: 14px;
+  height: 14px;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -341,6 +358,10 @@ input::placeholder {
 }
 
 .tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   flex: 1;
   padding: var(--space-sm) var(--space-md);
   border: none;

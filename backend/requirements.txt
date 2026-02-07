@@ -5,7 +5,6 @@ python-multipart==0.0.9
 
 # Redis
 redis==5.0.1
-aioredis==2.0.1
 
 # OpenTelemetry
 opentelemetry-api==1.22.0

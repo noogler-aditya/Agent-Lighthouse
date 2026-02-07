@@ -3,15 +3,10 @@ WebSocket router for real-time updates
 """
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from services.connection_manager import ConnectionManager
+from security import authenticate_websocket
 
 
 router = APIRouter(tags=["websocket"])
-
-
-async def get_manager() -> ConnectionManager:
-    from main import connection_manager
-    return connection_manager
 
 
 @router.websocket("/ws")
@@ -24,7 +19,10 @@ async def websocket_endpoint(websocket: WebSocket):
     - Unsubscribe from traces: {"action": "unsubscribe", "trace_id": "xxx"}
     - Ping: {"action": "ping"}
     """
-    manager = await get_manager()
+    if not await authenticate_websocket(websocket):
+        return
+
+    manager = websocket.app.state.connection_manager
     await manager.connect(websocket)
     
     try:
@@ -85,7 +83,10 @@ async def trace_websocket(websocket: WebSocket, trace_id: str):
     WebSocket endpoint for a specific trace.
     Automatically subscribes to updates for the given trace.
     """
-    manager = await get_manager()
+    if not await authenticate_websocket(websocket):
+        return
+
+    manager = websocket.app.state.connection_manager
     await manager.connect(websocket)
     manager.subscribe_to_trace(websocket, trace_id)
     

@@ -1,9 +1,9 @@
 """
 HTTP Client for Agent Lighthouse API
 """
+import asyncio
 import httpx
 from typing import Optional, Any
-from datetime import datetime
 
 
 class LighthouseClient:
@@ -14,19 +14,28 @@ class LighthouseClient:
     def __init__(
         self,
         base_url: str = "http://localhost:8000",
-        timeout: float = 30.0
+        timeout: float = 30.0,
+        api_key: Optional[str] = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.api_key = api_key
         self._client: Optional[httpx.Client] = None
         self._async_client: Optional[httpx.AsyncClient] = None
+
+    @property
+    def _default_headers(self) -> dict[str, str]:
+        if not self.api_key:
+            return {}
+        return {"X-API-Key": self.api_key}
     
     @property
     def client(self) -> httpx.Client:
         if self._client is None:
             self._client = httpx.Client(
                 base_url=self.base_url,
-                timeout=self.timeout
+                timeout=self.timeout,
+                headers=self._default_headers,
             )
         return self._client
     
@@ -35,16 +44,23 @@ class LighthouseClient:
         if self._async_client is None:
             self._async_client = httpx.AsyncClient(
                 base_url=self.base_url,
-                timeout=self.timeout
+                timeout=self.timeout,
+                headers=self._default_headers,
             )
         return self._async_client
     
     def close(self):
         if self._client:
             self._client.close()
+            self._client = None
         if self._async_client:
-            import asyncio
-            asyncio.get_event_loop().run_until_complete(self._async_client.aclose())
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                asyncio.run(self._async_client.aclose())
+            else:
+                loop.create_task(self._async_client.aclose())
+            self._async_client = None
     
     # ============ TRACES ============
     
@@ -53,14 +69,14 @@ class LighthouseClient:
         name: str,
         description: Optional[str] = None,
         framework: Optional[str] = None,
-        metadata: dict = {}
+        metadata: Optional[dict] = None,
     ) -> dict:
         """Create a new trace"""
         response = self.client.post("/api/traces", json={
             "name": name,
             "description": description,
             "framework": framework,
-            "metadata": metadata
+            "metadata": metadata or {},
         })
         response.raise_for_status()
         return response.json()
@@ -100,7 +116,7 @@ class LighthouseClient:
         agent_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         input_data: Optional[dict] = None,
-        attributes: dict = {}
+        attributes: Optional[dict] = None,
     ) -> dict:
         """Create a new span"""
         response = self.client.post(f"/api/traces/{trace_id}/spans", json={
@@ -110,7 +126,7 @@ class LighthouseClient:
             "agent_id": agent_id,
             "agent_name": agent_name,
             "input_data": input_data,
-            "attributes": attributes
+            "attributes": attributes or {},
         })
         response.raise_for_status()
         return response.json()
@@ -162,6 +178,25 @@ class LighthouseClient:
             return None
         response.raise_for_status()
         return response.json()
+
+    def initialize_state(
+        self,
+        trace_id: str,
+        memory: Optional[dict] = None,
+        context: Optional[dict] = None,
+        variables: Optional[dict] = None,
+    ) -> dict:
+        """Initialize state for a trace."""
+        response = self.client.post(
+            f"/api/state/{trace_id}",
+            json={
+                "memory": memory or {},
+                "context": context or {},
+                "variables": variables or {},
+            },
+        )
+        response.raise_for_status()
+        return response.json()
     
     def update_state(
         self,
@@ -180,6 +215,9 @@ class LighthouseClient:
             data["variables"] = variables
         
         response = self.client.put(f"/api/state/{trace_id}", json=data)
+        if response.status_code == 404:
+            self.initialize_state(trace_id=trace_id, memory=memory, context=context, variables=variables)
+            response = self.client.put(f"/api/state/{trace_id}", json=data)
         response.raise_for_status()
         return response.json()
     

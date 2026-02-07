@@ -64,12 +64,12 @@ class Span(BaseModel):
     
     # Metadata
     attributes: dict[str, Any] = Field(default_factory=dict)
-    
+
     def complete(self, status: SpanStatus = SpanStatus.SUCCESS, output: Optional[dict] = None):
         """Mark span as complete"""
         self.end_time = datetime.utcnow()
         self.status = status
-        if output:
+        if output is not None:
             self.output_data = output
         if self.start_time and self.end_time:
             self.duration_ms = (self.end_time - self.start_time).total_seconds() * 1000
@@ -107,22 +107,17 @@ class Trace(BaseModel):
     # Metadata
     framework: Optional[str] = None  # e.g., "crewai", "langgraph"
     metadata: dict[str, Any] = Field(default_factory=dict)
-    
+
     def add_span(self, span: Span):
-        """Add a span to the trace and update metrics"""
+        """Add a span or replace an existing span with the same id."""
+        for idx, existing_span in enumerate(self.spans):
+            if existing_span.span_id == span.span_id:
+                self.spans[idx] = span
+                self.recalculate_aggregates()
+                return
+
         self.spans.append(span)
-        self.total_tokens += span.total_tokens
-        self.total_cost_usd += span.cost_usd
-        
-        if span.kind == SpanKind.AGENT:
-            self.agent_count += 1
-        elif span.kind == SpanKind.TOOL:
-            self.tool_calls += 1
-        elif span.kind == SpanKind.LLM:
-            self.llm_calls += 1
-            
-        if not self.root_span_id and span.parent_span_id is None:
-            self.root_span_id = span.span_id
+        self.recalculate_aggregates()
     
     def complete(self, status: SpanStatus = SpanStatus.SUCCESS):
         """Mark trace as complete"""
@@ -130,7 +125,30 @@ class Trace(BaseModel):
         self.status = status
         if self.start_time and self.end_time:
             self.duration_ms = (self.end_time - self.start_time).total_seconds() * 1000
-    
+
+    def recalculate_aggregates(self):
+        """Rebuild all aggregate counters from current spans."""
+        self.total_tokens = 0
+        self.total_cost_usd = 0.0
+        self.agent_count = 0
+        self.tool_calls = 0
+        self.llm_calls = 0
+        self.root_span_id = None
+
+        for span in self.spans:
+            self.total_tokens += span.total_tokens
+            self.total_cost_usd += span.cost_usd
+
+            if span.kind == SpanKind.AGENT:
+                self.agent_count += 1
+            elif span.kind == SpanKind.TOOL:
+                self.tool_calls += 1
+            elif span.kind == SpanKind.LLM:
+                self.llm_calls += 1
+
+            if self.root_span_id is None and span.parent_span_id is None:
+                self.root_span_id = span.span_id
+
     def get_span_tree(self) -> dict:
         """Build hierarchical span tree for visualization"""
         spans_by_id = {s.span_id: s for s in self.spans}
@@ -140,13 +158,17 @@ class Trace(BaseModel):
             if span.parent_span_id and span.parent_span_id in children:
                 children[span.parent_span_id].append(span.span_id)
         
-        def build_tree(span_id: str) -> dict:
+        def build_tree(span_id: str, visited: set[str]) -> dict:
+            if span_id in visited:
+                return {"span": {"span_id": span_id, "error": "cycle_detected"}, "children": []}
+
+            visited.add(span_id)
             span = spans_by_id[span_id]
             return {
                 "span": span.model_dump(),
-                "children": [build_tree(cid) for cid in children[span_id]]
+                "children": [build_tree(cid, visited.copy()) for cid in children[span_id]]
             }
-        
+
         if self.root_span_id:
-            return build_tree(self.root_span_id)
+            return build_tree(self.root_span_id, set())
         return {}

@@ -1,9 +1,10 @@
 import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
+import { Cpu } from '../icons/AppIcons';
 import './TraceGraph.css';
 
 const LLMNode = memo(({ data }) => {
-    const { name, model, tokens, promptTokens, completionTokens, cost, status } = data;
+    const { name, model, promptTokens, completionTokens, cost, status } = data;
 
     const getStatusClass = () => {
         switch (status) {
@@ -19,7 +20,7 @@ const LLMNode = memo(({ data }) => {
             <Handle type="target" position={Position.Top} />
 
             <div className="node-header">
-                <div className="node-icon llm-icon">🧠</div>
+                <Cpu className="ui-icon node-icon llm-icon" />
                 <div className="node-title">{name || 'LLM Call'}</div>
             </div>
 

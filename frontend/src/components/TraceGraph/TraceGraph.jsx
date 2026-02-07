@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
+import { Search } from '../icons/AppIcons';
 import ReactFlow, {
     Background,
     Controls,
@@ -124,7 +125,7 @@ export default function TraceGraph({ trace, onSpanClick }) {
     if (!trace) {
         return (
             <div className="trace-graph-empty">
-                <div className="empty-icon">🔍</div>
+                <Search className="ui-icon empty-icon" />
                 <div className="empty-text">No trace selected</div>
                 <div className="empty-hint">Select a trace from the sidebar to visualize</div>
             </div>

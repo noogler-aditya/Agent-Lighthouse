@@ -2,20 +2,21 @@
 Traces API router
 """
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends, Query
+from pydantic import BaseModel, Field
 
 from models.trace import Trace, Span, SpanKind, SpanStatus
+from dependencies import get_redis, get_connection_manager
+from security import require_api_key
+from services.connection_manager import ConnectionManager
 from services.redis_service import RedisService
 
 
-router = APIRouter(prefix="/api/traces", tags=["traces"])
-
-
-# Dependency to get Redis service
-async def get_redis() -> RedisService:
-    from main import redis_service
-    return redis_service
+router = APIRouter(
+    prefix="/api/traces",
+    tags=["traces"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 # ============ REQUEST/RESPONSE MODELS ============
@@ -24,7 +25,7 @@ class CreateTraceRequest(BaseModel):
     name: str
     description: Optional[str] = None
     framework: Optional[str] = None
-    metadata: dict = {}
+    metadata: dict = Field(default_factory=dict)
 
 
 class CreateSpanRequest(BaseModel):
@@ -34,7 +35,7 @@ class CreateSpanRequest(BaseModel):
     agent_id: Optional[str] = None
     agent_name: Optional[str] = None
     input_data: Optional[dict] = None
-    attributes: dict = {}
+    attributes: dict = Field(default_factory=dict)
 
 
 class UpdateSpanRequest(BaseModel):
@@ -59,16 +60,17 @@ class TraceListResponse(BaseModel):
 
 @router.get("", response_model=TraceListResponse)
 async def list_traces(
-    offset: int = 0,
-    limit: int = 50,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
     status: Optional[str] = None,
     redis: RedisService = Depends(get_redis)
 ):
     """List all traces with pagination"""
     traces = await redis.list_traces(offset=offset, limit=limit, status=status)
+    total = await redis.count_traces(status=status)
     return TraceListResponse(
         traces=traces,
-        total=len(traces),  # TODO: Get actual total count
+        total=total,
         offset=offset,
         limit=limit
     )
@@ -151,7 +153,8 @@ async def get_trace_tree(
 async def create_span(
     trace_id: str,
     request: CreateSpanRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """Add a span to a trace"""
     trace = await redis.get_trace(trace_id)
@@ -168,11 +171,12 @@ async def create_span(
         input_data=request.input_data,
         attributes=request.attributes
     )
-    
-    await redis.add_span(span)
+
+    updated = await redis.add_span(span)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Trace not found")
     
     # Broadcast to WebSocket clients
-    from main import connection_manager
     await connection_manager.broadcast_span_event(
         trace_id=trace_id,
         span_id=span.span_id,
@@ -188,7 +192,8 @@ async def update_span(
     trace_id: str,
     span_id: str,
     request: UpdateSpanRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    connection_manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """Update a span"""
     trace = await redis.get_trace(trace_id)
@@ -224,10 +229,11 @@ async def update_span(
         span.error_message = request.error_message
         span.error_type = request.error_type
     
-    await redis.update_span(trace_id, span)
+    updated = await redis.update_span(trace_id, span)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Span not found")
     
     # Broadcast update
-    from main import connection_manager
     await connection_manager.broadcast_span_event(
         trace_id=trace_id,
         span_id=span_id,

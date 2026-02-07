@@ -3,33 +3,42 @@ Agent Lighthouse - Multi-Agent Observability Backend
 
 A framework-agnostic visual debugger for multi-agent AI systems.
 """
-import os
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from config import get_settings
 from services.redis_service import RedisService
 from services.connection_manager import ConnectionManager
 from routers import traces_router, agents_router, state_router, websocket_router
 
-
-# Global instances
-redis_service = RedisService(
-    redis_url=os.getenv("REDIS_URL", "redis://localhost:6379")
-)
-connection_manager = ConnectionManager()
+logger = logging.getLogger(__name__)
+settings = get_settings()
+if settings.require_auth and settings.api_key == "change-me-in-production":
+    logger.warning("Using default LIGHTHOUSE_API_KEY value; set a strong key before production deployment.")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - connect/disconnect Redis"""
+    redis_service = RedisService(
+        redis_url=settings.redis_url,
+        trace_ttl_hours=settings.trace_ttl_hours,
+    )
+    connection_manager = ConnectionManager()
+    app.state.redis_service = redis_service
+    app.state.connection_manager = connection_manager
+    app.state.settings = settings
+
     # Startup
     await redis_service.connect()
-    print("✓ Connected to Redis")
+    logger.info("Connected to Redis")
     yield
+
     # Shutdown
     await redis_service.disconnect()
-    print("✓ Disconnected from Redis")
+    logger.info("Disconnected from Redis")
 
 
 # Create FastAPI app
@@ -41,10 +50,11 @@ app = FastAPI(
 )
 
 # CORS configuration
+allow_credentials = settings.cors_allow_credentials and "*" not in settings.allowed_origins_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
-    allow_credentials=True,
+    allow_origins=settings.allowed_origins_list,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -70,6 +80,8 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Detailed health check"""
+    redis_service = app.state.redis_service
+    connection_manager = app.state.connection_manager
     redis_connected = redis_service.redis is not None
     return {
         "status": "healthy" if redis_connected else "degraded",

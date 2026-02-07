@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Editor from '@monaco-editor/react';
+import { Pause, Pencil, Play, SkipForward } from '../icons/AppIcons';
 import './StateInspector.css';
 
 export default function StateInspector({
@@ -29,18 +30,12 @@ export default function StateInspector({
 
     const content = getContent();
 
-    useEffect(() => {
-        if (content && editMode) {
-            setEditedValue(JSON.stringify(content, null, 2));
-        }
-    }, [content, editMode]);
-
     const handleSave = () => {
         try {
             const parsed = JSON.parse(editedValue);
             onModifyState?.({ [activeTab]: parsed });
             setEditMode(false);
-        } catch (e) {
+        } catch {
             alert('Invalid JSON');
         }
     };
@@ -70,23 +65,26 @@ export default function StateInspector({
                         onClick={onPause}
                         disabled={controlStatus === 'paused'}
                         title="Pause"
+                        aria-label="Pause execution"
                     >
-                        ⏸
+                        <Pause className="ui-icon ui-icon-sm" />
                     </button>
                     <button
                         className="btn btn-success btn-icon"
                         onClick={onResume}
                         disabled={controlStatus === 'running'}
                         title="Resume"
+                        aria-label="Resume execution"
                     >
-                        ▶
+                        <Play className="ui-icon ui-icon-sm" />
                     </button>
                     <button
                         className="btn btn-secondary btn-icon"
                         onClick={() => onStep?.(1)}
                         title="Step"
+                        aria-label="Step execution"
                     >
-                        ⏭
+                        <SkipForward className="ui-icon ui-icon-sm" />
                     </button>
                 </div>
             </div>
@@ -100,7 +98,12 @@ export default function StateInspector({
                             className={`tab ${activeTab === tab ? 'active' : ''}`}
                             onClick={() => {
                                 setActiveTab(tab);
-                                setEditMode(false);
+                                if (editMode) {
+                                    const nextContent = state?.[tab] ?? null;
+                                    setEditedValue(JSON.stringify(nextContent, null, 2));
+                                } else {
+                                    setEditMode(false);
+                                }
                             }}
                         >
                             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -157,10 +160,14 @@ export default function StateInspector({
                 ) : (
                     <button
                         className="btn btn-secondary"
-                        onClick={() => setEditMode(true)}
+                        onClick={() => {
+                            setEditedValue(JSON.stringify(content, null, 2));
+                            setEditMode(true);
+                        }}
                         disabled={!state || controlStatus === 'running'}
                     >
-                        ✏️ Edit State
+                        <Pencil className="ui-icon ui-icon-sm" />
+                        Edit State
                     </button>
                 )}
             </div>

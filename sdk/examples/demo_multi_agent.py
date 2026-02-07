@@ -3,13 +3,15 @@ Demo script showing Agent Lighthouse SDK usage
 """
 import time
 import random
-from agent_lighthouse import LighthouseTracer, trace_agent, trace_tool, trace_llm, get_tracer
+import os
+from agent_lighthouse import trace_agent, trace_tool, trace_llm, get_tracer
 
 
 # Initialize tracer
-tracer = LighthouseTracer(
+tracer = get_tracer(
     base_url="http://localhost:8000",
-    framework="demo"
+    framework="demo",
+    api_key=os.getenv("LIGHTHOUSE_API_KEY", "local-dev-key"),
 )
 
 
@@ -119,14 +121,15 @@ def run_demo():
     print("🔦 Agent Lighthouse Demo")
     print("=" * 50)
     print("Starting multi-agent workflow...")
-    print("Open http://localhost:3000 to see the trace!")
+    print("Open http://localhost:5173 to see the trace!")
     print("=" * 50)
     
     with tracer.trace(
         name="Content Creation Workflow",
         description="Demo workflow with Research, Writer, and Editor agents",
         metadata={"demo": True, "version": "1.0"}
-    ):
+    ) as trace_info:
+        print(f"Trace ID: {trace_info['trace_id']}")
         # Research phase
         print("\n📚 Research Agent working...")
         research = research_agent("Artificial Intelligence trends 2024")

@@ -1,28 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
+import { Coins, SearchCode } from './components/icons/AppIcons';
 import { useWebSocket, useTraces, useAgentState } from './hooks';
 import { Sidebar } from './components/Sidebar';
-import { TraceGraph } from './components/TraceGraph';
-import { TokenMonitor } from './components/TokenMonitor';
-import { StateInspector } from './components/StateInspector';
 import './App.css';
+
+const TraceGraph = lazy(() => import('./components/TraceGraph/TraceGraph'));
+const TokenMonitor = lazy(() => import('./components/TokenMonitor/TokenMonitor'));
+const StateInspector = lazy(() => import('./components/StateInspector/StateInspector'));
 
 function App() {
   const [activeRightTab, setActiveRightTab] = useState('tokens');
   const [selectedSpan, setSelectedSpan] = useState(null);
 
   // WebSocket connection
-  const { isConnected, onMessage, subscribeToTrace } = useWebSocket();
+  const { isConnected, onMessage, subscribeToTrace, unsubscribeFromTrace } = useWebSocket();
 
   // Traces data
   const {
     traces,
     selectedTrace,
     loading,
+    errorCode,
+    errorMessage,
+    lastFetchAt,
     fetchTrace,
     fetchTraces,
     deleteTrace,
-    setSelectedTrace,
     addSpanToTrace,
+    updateSpanInTrace,
   } = useTraces();
 
   // Agent state
@@ -38,12 +43,17 @@ function App() {
 
   // Handle trace selection
   const handleSelectTrace = useCallback(async (traceId) => {
-    const trace = await fetchTrace(traceId);
-    if (trace) {
-      subscribeToTrace(traceId);
-      fetchState();
-    }
-  }, [fetchTrace, subscribeToTrace, fetchState]);
+    await fetchTrace(traceId);
+  }, [fetchTrace]);
+
+  useEffect(() => {
+    if (!isConnected || !selectedTrace?.trace_id) return;
+    subscribeToTrace(selectedTrace.trace_id);
+    fetchState();
+    return () => {
+      unsubscribeFromTrace(selectedTrace.trace_id);
+    };
+  }, [isConnected, selectedTrace?.trace_id, subscribeToTrace, unsubscribeFromTrace, fetchState]);
 
   // Handle WebSocket messages
   useEffect(() => {
@@ -57,6 +67,12 @@ function App() {
       fetchTraces();
     });
 
+    const unsubSpanUpdated = onMessage('span_updated', (data) => {
+      if (data.data) {
+        updateSpanInTrace(data.data);
+      }
+    });
+
     const unsubState = onMessage('state_change', (data) => {
       if (selectedTrace?.trace_id === data.trace_id) {
         fetchState();
@@ -65,10 +81,11 @@ function App() {
 
     return () => {
       unsubSpan();
+      unsubSpanUpdated();
       unsubTrace();
       unsubState();
     };
-  }, [onMessage, addSpanToTrace, fetchTraces, fetchState, selectedTrace]);
+  }, [onMessage, addSpanToTrace, updateSpanInTrace, fetchTraces, fetchState, selectedTrace?.trace_id]);
 
   return (
     <div className="app-container">
@@ -80,6 +97,10 @@ function App() {
         onDeleteTrace={deleteTrace}
         loading={loading}
         isConnected={isConnected}
+        errorCode={errorCode}
+        errorMessage={errorMessage}
+        lastFetchAt={lastFetchAt}
+        onRetry={fetchTraces}
       />
 
       {/* Main Content */}
@@ -119,10 +140,12 @@ function App() {
         <div className="main-body">
           {/* Graph Panel */}
           <div className="graph-panel">
-            <TraceGraph
-              trace={selectedTrace}
-              onSpanClick={setSelectedSpan}
-            />
+            <Suspense fallback={<div className="panel-loading">Loading graph...</div>}>
+              <TraceGraph
+                trace={selectedTrace}
+                onSpanClick={setSelectedSpan}
+              />
+            </Suspense>
           </div>
 
           {/* Right Panel */}
@@ -134,13 +157,15 @@ function App() {
                   className={`tab ${activeRightTab === 'tokens' ? 'active' : ''}`}
                   onClick={() => setActiveRightTab('tokens')}
                 >
-                  💰 Tokens
+                  <Coins className="ui-icon ui-icon-sm" />
+                  Tokens
                 </button>
                 <button
                   className={`tab ${activeRightTab === 'state' ? 'active' : ''}`}
                   onClick={() => setActiveRightTab('state')}
                 >
-                  🔍 State
+                  <SearchCode className="ui-icon ui-icon-sm" />
+                  State
                 </button>
               </div>
             </div>
@@ -148,17 +173,21 @@ function App() {
             {/* Panel Content */}
             <div className="right-panel-content">
               {activeRightTab === 'tokens' ? (
-                <TokenMonitor trace={selectedTrace} />
+                <Suspense fallback={<div className="panel-loading">Loading metrics...</div>}>
+                  <TokenMonitor trace={selectedTrace} />
+                </Suspense>
               ) : (
-                <StateInspector
-                  traceId={selectedTrace?.trace_id}
-                  state={agentState}
-                  controlStatus={controlStatus}
-                  onPause={pause}
-                  onResume={resume}
-                  onStep={step}
-                  onModifyState={bulkModifyState}
-                />
+                <Suspense fallback={<div className="panel-loading">Loading inspector...</div>}>
+                  <StateInspector
+                    traceId={selectedTrace?.trace_id}
+                    state={agentState}
+                    controlStatus={controlStatus}
+                    onPause={pause}
+                    onResume={resume}
+                    onStep={step}
+                    onModifyState={bulkModifyState}
+                  />
+                </Suspense>
               )}
             </div>
           </div>

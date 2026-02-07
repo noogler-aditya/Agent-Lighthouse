@@ -3,18 +3,19 @@ Agents API router
 """
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from dependencies import get_redis
 from models.agent import Agent, AgentStatus
+from security import require_api_key
 from services.redis_service import RedisService
 
 
-router = APIRouter(prefix="/api/agents", tags=["agents"])
-
-
-async def get_redis() -> RedisService:
-    from main import redis_service
-    return redis_service
+router = APIRouter(
+    prefix="/api/agents",
+    tags=["agents"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 # ============ REQUEST MODELS ============
@@ -25,9 +26,9 @@ class RegisterAgentRequest(BaseModel):
     goal: Optional[str] = None
     framework: Optional[str] = None
     agent_type: Optional[str] = None
-    tools: list[str] = []
+    tools: list[str] = Field(default_factory=list)
     model: Optional[str] = None
-    config: dict = {}
+    config: dict = Field(default_factory=dict)
 
 
 class AgentListResponse(BaseModel):

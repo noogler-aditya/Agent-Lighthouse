@@ -2,10 +2,10 @@
 Tracer and decorators for instrumenting agent code
 """
 import functools
-import time
 import uuid
 from typing import Optional, Callable, Any
 from contextlib import contextmanager
+from contextvars import ContextVar
 from .client import LighthouseClient
 
 
@@ -26,9 +26,10 @@ class LighthouseTracer:
         self,
         base_url: str = "http://localhost:8000",
         framework: Optional[str] = None,
-        auto_pause_check: bool = True
+        auto_pause_check: bool = True,
+        api_key: Optional[str] = None,
     ):
-        self.client = LighthouseClient(base_url=base_url)
+        self.client = LighthouseClient(base_url=base_url, api_key=api_key)
         self.framework = framework
         self.auto_pause_check = auto_pause_check
         
@@ -49,7 +50,7 @@ class LighthouseTracer:
         self,
         name: str,
         description: Optional[str] = None,
-        metadata: dict = {}
+        metadata: Optional[dict] = None,
     ):
         """
         Context manager for creating a trace.
@@ -62,9 +63,10 @@ class LighthouseTracer:
             name=name,
             description=description,
             framework=self.framework,
-            metadata=metadata
+            metadata=metadata or {},
         )
         self._current_trace_id = trace_data["trace_id"]
+        context_token = _active_tracer.set(self)
         
         try:
             yield trace_data
@@ -73,6 +75,7 @@ class LighthouseTracer:
             self.client.complete_trace(self._current_trace_id, "error")
             raise
         finally:
+            _active_tracer.reset(context_token)
             self._current_trace_id = None
             self._span_stack.clear()
     
@@ -84,7 +87,7 @@ class LighthouseTracer:
         agent_id: Optional[str] = None,
         agent_name: Optional[str] = None,
         input_data: Optional[dict] = None,
-        attributes: dict = {}
+        attributes: Optional[dict] = None,
     ):
         """
         Context manager for creating a span within a trace.
@@ -110,19 +113,16 @@ class LighthouseTracer:
             agent_id=agent_id,
             agent_name=agent_name,
             input_data=input_data,
-            attributes=attributes
+            attributes=attributes or {},
         )
         
         span_id = span_data["span_id"]
         self._span_stack.append(span_id)
         self._current_span_id = span_id
         
-        start_time = time.time()
-        
         try:
             yield span_data
             
-            duration_ms = (time.time() - start_time) * 1000
             self.client.update_span(
                 trace_id=self._current_trace_id,
                 span_id=span_id,
@@ -181,16 +181,24 @@ class LighthouseTracer:
 
 # Global tracer instance
 _global_tracer: Optional[LighthouseTracer] = None
+_active_tracer: ContextVar[Optional[LighthouseTracer]] = ContextVar(
+    "active_lighthouse_tracer", default=None
+)
 
 
 def get_tracer(
     base_url: str = "http://localhost:8000",
-    framework: Optional[str] = None
+    framework: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> LighthouseTracer:
     """Get or create the global tracer instance"""
+    active_tracer = _active_tracer.get()
+    if active_tracer is not None:
+        return active_tracer
+
     global _global_tracer
     if _global_tracer is None:
-        _global_tracer = LighthouseTracer(base_url=base_url, framework=framework)
+        _global_tracer = LighthouseTracer(base_url=base_url, framework=framework, api_key=api_key)
     return _global_tracer
 
 

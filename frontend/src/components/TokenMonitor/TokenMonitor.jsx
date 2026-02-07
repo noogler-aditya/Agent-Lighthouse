@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Coins, Cpu, Hash, Wrench } from '../icons/AppIcons';
 import {
     PieChart,
     Pie,
@@ -9,7 +10,6 @@ import {
     YAxis,
     Tooltip,
     ResponsiveContainer,
-    Legend,
 } from 'recharts';
 import './TokenMonitor.css';
 
@@ -63,28 +63,28 @@ export default function TokenMonitor({ trace }) {
             {/* Summary Cards */}
             <div className="metrics-summary">
                 <div className="metric-card">
-                    <div className="metric-icon">🔢</div>
+                    <Hash className="ui-icon metric-icon" />
                     <div className="metric-content">
                         <div className="metric-value">{metrics.totalTokens.toLocaleString()}</div>
                         <div className="metric-label">Total Tokens</div>
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-icon">💰</div>
+                    <Coins className="ui-icon metric-icon" />
                     <div className="metric-content">
                         <div className="metric-value">${metrics.totalCost.toFixed(4)}</div>
                         <div className="metric-label">Total Cost</div>
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-icon">🧠</div>
+                    <Cpu className="ui-icon metric-icon" />
                     <div className="metric-content">
                         <div className="metric-value">{metrics.llmCalls}</div>
                         <div className="metric-label">LLM Calls</div>
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-icon">🔧</div>
+                    <Wrench className="ui-icon metric-icon" />
                     <div className="metric-content">
                         <div className="metric-value">{metrics.toolCalls}</div>
                         <div className="metric-label">Tool Calls</div>

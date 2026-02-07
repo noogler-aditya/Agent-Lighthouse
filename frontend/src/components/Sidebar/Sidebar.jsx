@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Bot, Cpu, Radar, RefreshCcw, Trash2, Wrench } from '../icons/AppIcons';
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -8,6 +9,10 @@ export default function Sidebar({
     onDeleteTrace,
     loading,
     isConnected,
+    errorCode,
+    errorMessage,
+    lastFetchAt,
+    onRetry,
 }) {
     const [search, setSearch] = useState('');
 
@@ -26,12 +31,27 @@ export default function Sidebar({
         return `${(ms / 1000).toFixed(1)}s`;
     };
 
+    const getErrorHint = () => {
+        if (errorCode === 401 || errorCode === 403) {
+            return 'API key missing/invalid (check VITE_API_KEY and LIGHTHOUSE_API_KEY)';
+        }
+        if (errorCode === 'NETWORK') {
+            return 'Backend unreachable at configured VITE_API_URL';
+        }
+        return 'Unable to load traces from backend';
+    };
+
+    const formatLastFetch = () => {
+        if (!lastFetchAt) return '';
+        return new Date(lastFetchAt).toLocaleTimeString();
+    };
+
     return (
         <div className="sidebar">
             {/* Header */}
             <div className="sidebar-header">
                 <div className="logo">
-                    <span className="logo-icon">🔦</span>
+                    <Radar className="ui-icon logo-icon" />
                     <span className="logo-text">Agent Lighthouse</span>
                 </div>
                 <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
@@ -52,8 +72,21 @@ export default function Sidebar({
 
             {/* Traces List */}
             <div className="traces-list">
-                {loading && filteredTraces.length === 0 ? (
+                {loading && filteredTraces.length === 0 && !errorMessage ? (
                     <div className="list-empty">Loading traces...</div>
+                ) : errorMessage ? (
+                    <div className="list-error">
+                        <div className="list-error-title">Could not load traces</div>
+                        <div className="list-error-hint">{getErrorHint()}</div>
+                        <div className="list-error-meta">
+                            {errorCode ? `Code: ${errorCode}` : 'Code: unknown'}
+                            {lastFetchAt ? ` • Last checked: ${formatLastFetch()}` : ''}
+                        </div>
+                        <button className="btn btn-secondary list-error-retry" onClick={onRetry}>
+                            <RefreshCcw className="ui-icon ui-icon-sm" />
+                            Retry
+                        </button>
+                    </div>
                 ) : filteredTraces.length === 0 ? (
                     <div className="list-empty">
                         {search ? 'No matching traces' : 'No traces yet'}
@@ -78,15 +111,15 @@ export default function Sidebar({
                             </div>
                             <div className="trace-stats">
                                 <span className="stat">
-                                    <span className="stat-icon">🤖</span>
+                                    <Bot className="ui-icon ui-icon-xs stat-icon" />
                                     {trace.agent_count}
                                 </span>
                                 <span className="stat">
-                                    <span className="stat-icon">🔧</span>
+                                    <Wrench className="ui-icon ui-icon-xs stat-icon" />
                                     {trace.tool_calls}
                                 </span>
                                 <span className="stat">
-                                    <span className="stat-icon">🧠</span>
+                                    <Cpu className="ui-icon ui-icon-xs stat-icon" />
                                     {trace.llm_calls}
                                 </span>
                                 <span className="stat cost">
@@ -101,8 +134,9 @@ export default function Sidebar({
                                         onDeleteTrace(trace.trace_id);
                                     }}
                                     title="Delete trace"
+                                    aria-label="Delete trace"
                                 >
-                                    🗑️
+                                    <Trash2 className="ui-icon ui-icon-xs" />
                                 </button>
                             )}
                         </div>

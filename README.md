@@ -82,6 +82,8 @@ cd Agent-Lighthouse
 docker-compose up -d
 ```
 
+Default local API key in `docker-compose.yml`: `local-dev-key`.
+
 ### Option 2: Manual Setup
 
 ```bash
@@ -91,11 +93,14 @@ docker run -d -p 6379:6379 redis:7-alpine
 # 2. Start Backend
 cd backend
 pip install -r requirements.txt
+export LIGHTHOUSE_API_KEY=local-dev-key
+export ALLOWED_ORIGINS=http://localhost:5173
 python3 -m uvicorn main:app --reload --port 8000
 
 # 3. Start Frontend (new terminal)
 cd frontend
 npm install
+export VITE_API_KEY=local-dev-key
 npm run dev
 ```
 
@@ -106,6 +111,80 @@ npm run dev
 | **Dashboard** | http://localhost:5173 |
 | **API Docs** | http://localhost:8000/docs |
 | **WebSocket** | ws://localhost:8000/ws |
+
+All API routes/WebSocket endpoints require `X-API-Key` by default.
+
+### Verification Flow (Recommended)
+
+Run these checks in order after startup:
+
+```bash
+# 1) Backend health
+curl -H "X-API-Key: local-dev-key" http://localhost:8000/health
+
+# 2) Trace list API
+curl -H "X-API-Key: local-dev-key" http://localhost:8000/api/traces
+
+# 3) Deterministic smoke trace ingestion
+cd sdk
+LIGHTHOUSE_API_KEY=local-dev-key python3 examples/smoke_trace_check.py
+```
+
+Expected results:
+- `/health` returns JSON with `status` and Redis connectivity
+- `/api/traces` returns a `traces` array (may be empty before smoke test)
+- `smoke_trace_check.py` exits with `[PASS]` and prints a trace ID
+- Dashboard sidebar should show at least one trace after refresh
+
+### If Dashboard Is Empty
+
+Use this checklist:
+
+1. Confirm frontend and backend API keys match:
+   - frontend: `VITE_API_KEY`
+   - backend: `LIGHTHOUSE_API_KEY`
+2. Confirm frontend backend URL:
+   - `VITE_API_URL` should point to `http://localhost:8000`
+3. Confirm backend CORS origin:
+   - `ALLOWED_ORIGINS` includes `http://localhost:5173`
+4. Run the smoke script and verify it passes:
+   - `python3 sdk/examples/smoke_trace_check.py`
+5. Check sidebar error panel text:
+   - `401/403` means API key mismatch
+   - `Backend unreachable` means URL/backend availability issue
+
+## 🔐 Production Security Checklist
+
+- Set a strong `LIGHTHOUSE_API_KEY`
+- Configure `ALLOWED_ORIGINS` to exact trusted origins
+- Keep Redis private (no public host port mapping)
+- Run behind HTTPS/WSS
+- Rotate API keys and monitor logs
+
+## 🔁 CI/CD
+
+This repo now includes GitHub Actions workflows for open-source style quality gates and delivery:
+
+- **CI** (`.github/workflows/ci.yml`)
+  - Runs on every push and pull request
+  - Frontend: install, lint, build
+  - Backend: dependency install, compile checks, app import check
+  - SDK: multi-Python checks (3.9-3.12)
+  - Integration: Redis + backend + SDK smoke trace ingestion test
+
+- **CD** (`.github/workflows/cd.yml`)
+  - Runs on merge/push to `main`
+  - Builds and publishes Docker images to GHCR:
+    - `ghcr.io/<owner>/<repo>/backend:latest`
+    - `ghcr.io/<owner>/<repo>/frontend:latest`
+    - plus immutable `sha-<commit>` tags
+
+### Recommended Repository Settings
+
+1. Protect `main` branch and require passing checks from CI before merge.
+2. Keep GitHub Packages enabled for GHCR publishing.
+3. Prefer squash merge for cleaner release history.
+4. Optionally require signed commits for maintainers.
 
 ---
 

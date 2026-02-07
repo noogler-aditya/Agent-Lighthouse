@@ -1,9 +1,10 @@
 import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
+import { TriangleAlert, Wrench } from '../icons/AppIcons';
 import './TraceGraph.css';
 
 const ToolNode = memo(({ data }) => {
-    const { name, status, input, output, error } = data;
+    const { name, status, error } = data;
 
     const getStatusClass = () => {
         switch (status) {
@@ -19,13 +20,13 @@ const ToolNode = memo(({ data }) => {
             <Handle type="target" position={Position.Top} />
 
             <div className="node-header">
-                <div className="node-icon tool-icon">🔧</div>
+                <Wrench className="ui-icon node-icon tool-icon" />
                 <div className="node-title">{name}</div>
             </div>
 
             {error && (
                 <div className="node-error">
-                    <span className="error-icon">⚠️</span>
+                    <TriangleAlert className="ui-icon ui-icon-xs error-icon" />
                     <span className="error-text">{error}</span>
                 </div>
             )}

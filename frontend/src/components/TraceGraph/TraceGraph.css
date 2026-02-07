@@ -68,7 +68,8 @@
 }
 
 .node-icon {
-    font-size: 18px;
+    width: 18px;
+    height: 18px;
 }
 
 .node-title {
@@ -132,7 +133,7 @@
 }
 
 .error-icon {
-    font-size: 12px;
+    color: var(--accent-error);
 }
 
 .error-text {
@@ -195,7 +196,8 @@
 }
 
 .trace-graph-empty .empty-icon {
-    font-size: 48px;
+    width: 48px;
+    height: 48px;
     opacity: 0.5;
 }
 
