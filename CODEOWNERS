@@ -1,0 +1,19 @@
+# Global ownership
+* @noogler-aditya
+
+# Backend
+/backend/ @noogler-aditya
+
+# Frontend
+/frontend/ @noogler-aditya
+
+# SDK
+/sdk/ @noogler-aditya
+
+# CI/CD and governance
+/.github/ @noogler-aditya
+/README.md @noogler-aditya
+/docs/ @noogler-aditya
+/GOVERNANCE.md @noogler-aditya
+/MAINTAINERS.md @noogler-aditya
+/RELEASE.md @noogler-aditya

@@ -53,9 +53,7 @@ Your Agent Code → Lighthouse SDK → Visual Dashboard
 
 ## 🖥️ Dashboard Preview
 
-<p align="center">
-  <img src="docs/dashboard-preview.png" alt="Agent Lighthouse Dashboard" width="800"/>
-</p>
+Run the stack locally to view the dashboard at `http://localhost:5173`.
 
 **Dashboard Components:**
 - **Sidebar**: Searchable list of all traces with quick stats
@@ -185,6 +183,25 @@ This repo now includes GitHub Actions workflows for open-source style quality ga
 2. Keep GitHub Packages enabled for GHCR publishing.
 3. Prefer squash merge for cleaner release history.
 4. Optionally require signed commits for maintainers.
+
+---
+
+## 📚 Project Documentation
+
+Core project and community docs:
+
+- [README](README.md) - setup, architecture, and API overview
+- [CONTRIBUTING](CONTRIBUTING.md) - contribution workflow and quality gates
+- [SECURITY](SECURITY.md) - vulnerability reporting and handling
+- [SUPPORT](SUPPORT.md) - support channels and triage expectations
+- [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) - community behavior standards
+- [GOVERNANCE](GOVERNANCE.md) - decision-making and maintainer model
+- [MAINTAINERS](MAINTAINERS.md) - maintainer roles and ownership areas
+- [RELEASE](RELEASE.md) - release process and versioning policy
+- [CHANGELOG](CHANGELOG.md) - notable changes
+- [Architecture](docs/ARCHITECTURE.md) - system design details
+- [Operations Runbook](docs/OPERATIONS.md) - production operations and incident flow
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - empty dashboard and common failure recovery
 
 ---
 
