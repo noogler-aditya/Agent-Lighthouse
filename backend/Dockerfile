@@ -10,7 +10,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade "pip>=24.3.1" "wheel>=0.46.2" \
     && pip install --no-cache-dir -r requirements.txt \
-    && (pip uninstall -y jaraco.context || true)
+    && (pip uninstall -y wheel jaraco.context || true)
 
 # Copy source
 COPY . .
