@@ -17,3 +17,9 @@ websockets==12.0
 # Utilities
 python-dotenv==1.0.1
 httpx==0.26.0
+
+# Security: Pin to patched versions (CVE-2026-23949, CVE-2026-24049)
+# These MUST be installed to override any transitive dependencies
+wheel>=0.46.2
+jaraco.context>=6.1.0
+setuptools>=75.8.0
