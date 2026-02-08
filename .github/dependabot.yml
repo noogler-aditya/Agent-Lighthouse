@@ -1,0 +1,75 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci)"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:10"
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "chore(frontend)"
+
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:20"
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "chore(backend)"
+
+  - package-ecosystem: "pip"
+    directory: "/sdk"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:30"
+    labels:
+      - "dependencies"
+      - "sdk"
+    commit-message:
+      prefix: "chore(sdk)"
+
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:40"
+    labels:
+      - "dependencies"
+      - "backend"
+      - "docker"
+    commit-message:
+      prefix: "chore(backend)"
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:50"
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "docker"
+    commit-message:
+      prefix: "chore(frontend)"

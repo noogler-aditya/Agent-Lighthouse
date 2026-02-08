@@ -40,8 +40,9 @@ LIGHTHOUSE_API_KEY=local-dev-key LIGHTHOUSE_BASE_URL=http://localhost:8000 pytho
 
 - CI workflow: `.github/workflows/ci.yml`
 - CD workflow: `.github/workflows/cd.yml`
+- Code scanning workflow: `.github/workflows/codeql.yml`
 - Required checks should be enforced via branch protection on `main`.
-- If CI fails on PR, workflow currently auto-closes PR and adds a comment.
+- If CI fails on PR, workflow comments and applies a `ci-failed` label for follow-up.
 
 ## Recovery Playbook
 

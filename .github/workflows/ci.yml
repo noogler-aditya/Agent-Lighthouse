@@ -1,13 +1,14 @@
 name: CI
 
 on:
+  pull_request:
   push:
     branches:
-      - "**"
-  pull_request:
+      - main
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -42,8 +43,14 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Test
+        run: npm run test
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
   backend:
-    name: Backend Static Checks
+    name: Backend Quality + Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -54,13 +61,24 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       - name: Install backend dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements-dev.txt
 
       - name: Compile backend sources
         run: python -m compileall backend
+
+      - name: Ruff checks
+        run: ruff check backend --select E9,F63,F7,F82
+
+      - name: Bandit security scan
+        run: bandit -q -r backend -x backend/tests
+
+      - name: Backend tests
+        run: pytest -q backend/tests
 
       - name: Import app
         env:
@@ -88,10 +106,19 @@ jobs:
           cache-dependency-path: sdk/pyproject.toml
 
       - name: Install SDK
-        run: pip install -e sdk
+        run: pip install -e "sdk[dev]"
 
       - name: Compile SDK sources
         run: python -m compileall sdk
+
+      - name: Ruff checks
+        run: ruff check sdk/agent_lighthouse --select E9,F63,F7,F82
+
+      - name: Bandit security scan
+        run: bandit -q -r sdk/agent_lighthouse -x sdk/tests
+
+      - name: SDK tests
+        run: pytest -q sdk/tests
 
       - name: Import SDK and tracer
         run: |
@@ -181,17 +208,60 @@ jobs:
         if: failure()
         run: cat backend.log
 
-  auto-close-failed-pr:
-    name: Auto Close Failed PR
-    if: ${{ github.event_name == 'pull_request' && failure() }}
+  container-security:
+    name: Container Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t agent-lighthouse-backend:ci ./backend
+
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "agent-lighthouse-backend:ci"
+          format: "table"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Build frontend image
+        run: docker build -t agent-lighthouse-frontend:ci ./frontend
+
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "agent-lighthouse-frontend:ci"
+          format: "table"
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
+          exit-code: "1"
+
+  notify-failed-pr:
+    name: Notify Failed PR
+    if: >-
+      ${{
+        always() &&
+        github.event_name == 'pull_request' &&
+        (
+          needs.frontend.result == 'failure' ||
+          needs.backend.result == 'failure' ||
+          needs.sdk.result == 'failure' ||
+          needs.integration.result == 'failure' ||
+          needs.container-security.result == 'failure'
+        )
+      }}
     needs:
       - frontend
       - backend
       - sdk
       - integration
+      - container-security
     runs-on: ubuntu-latest
     steps:
-      - name: Comment and close PR
+      - name: Comment and label failed PR
         uses: actions/github-script@v7
         with:
           script: |
@@ -202,9 +272,9 @@ jobs:
             }
 
             const body = [
-              "Closing automatically because CI checks failed.",
+              "CI checks failed for this pull request.",
               "",
-              "Please fix the failing workflow checks and open a new PR."
+              "Please push fixes and CI will re-run automatically."
             ].join("\n");
 
             await github.rest.issues.createComment({
@@ -214,9 +284,9 @@ jobs:
               body
             });
 
-            await github.rest.pulls.update({
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: prNumber,
-              state: "closed"
+              issue_number: prNumber,
+              labels: ["ci-failed"]
             });

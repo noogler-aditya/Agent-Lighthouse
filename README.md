@@ -164,11 +164,13 @@ Use this checklist:
 This repo now includes GitHub Actions workflows for open-source style quality gates and delivery:
 
 - **CI** (`.github/workflows/ci.yml`)
-  - Runs on every push and pull request
-  - Frontend: install, lint, build
-  - Backend: dependency install, compile checks, app import check
-  - SDK: multi-Python checks (3.9-3.12)
+  - Runs on pull requests and pushes to `main`
+  - Frontend: install, lint, build, tests, dependency audit
+  - Backend: static/security checks + pytest suite + app import check
+  - SDK: multi-Python static/security checks + pytest suite (3.9-3.12)
   - Integration: Redis + backend + SDK smoke trace ingestion test
+  - Container image vulnerability scanning (Trivy)
+  - Failed pull requests are labeled/commented for follow-up (not auto-closed)
 
 - **CD** (`.github/workflows/cd.yml`)
   - Runs on merge/push to `main`
@@ -176,6 +178,12 @@ This repo now includes GitHub Actions workflows for open-source style quality ga
     - `ghcr.io/<owner>/<repo>/backend:latest`
     - `ghcr.io/<owner>/<repo>/frontend:latest`
     - plus immutable `sha-<commit>` tags
+
+- **CodeQL** (`.github/workflows/codeql.yml`)
+  - GitHub code scanning for Python and JavaScript
+
+- **Release** (`.github/workflows/release.yml`)
+  - Creates GitHub releases automatically on `v*` tags
 
 ### Recommended Repository Settings
 

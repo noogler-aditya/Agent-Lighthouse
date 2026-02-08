@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Coverage and reports
+.coverage
+coverage/
+htmlcov/
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/

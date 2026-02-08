@@ -49,10 +49,11 @@ LIGHTHOUSE_API_KEY=local-dev-key python3 examples/smoke_trace_check.py
 
 Your PR should pass:
 
-- Frontend lint/build
-- Backend static checks
-- SDK matrix checks
+- Frontend lint/build/tests
+- Backend quality checks + tests
+- SDK matrix quality checks + tests
 - Integration smoke test
+- Container vulnerability scan
 
 These checks run in GitHub Actions (`.github/workflows/ci.yml`).
 
