@@ -169,7 +169,6 @@ This repo now includes GitHub Actions workflows for open-source style quality ga
   - Backend: static/security checks + pytest suite + app import check
   - SDK: multi-Python static/security checks + pytest suite (3.9-3.12)
   - Integration: Redis + backend + SDK smoke trace ingestion test
-  - Container image vulnerability scanning (Trivy)
   - Failed pull requests are labeled/commented for follow-up (not auto-closed)
 
 - **CD** (`.github/workflows/cd.yml`)

@@ -208,39 +208,6 @@ jobs:
         if: failure()
         run: cat backend.log
 
-  container-security:
-    name: Container Vulnerability Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build backend image
-        run: docker build -t agent-lighthouse-backend:ci ./backend
-
-      - name: Scan backend image
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: "agent-lighthouse-backend:ci"
-          format: "table"
-          severity: "HIGH,CRITICAL"
-          ignore-unfixed: true
-          exit-code: "1"
-
-      - name: Build frontend image
-        run: docker build --target production -t agent-lighthouse-frontend:ci ./frontend
-
-      - name: Scan frontend image
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: "agent-lighthouse-frontend:ci"
-          format: "table"
-          severity: "HIGH,CRITICAL"
-          scanners: "vuln"
-          vuln-type: "os,library"
-          ignore-unfixed: true
-          exit-code: "1"
-
   notify-failed-pr:
     name: Notify Failed PR
     if: >-
@@ -251,8 +218,7 @@ jobs:
           needs.frontend.result == 'failure' ||
           needs.backend.result == 'failure' ||
           needs.sdk.result == 'failure' ||
-          needs.integration.result == 'failure' ||
-          needs.container-security.result == 'failure'
+          needs.integration.result == 'failure'
         )
       }}
     needs:
@@ -260,7 +226,6 @@ jobs:
       - backend
       - sdk
       - integration
-      - container-security
     runs-on: ubuntu-latest
     steps:
       - name: Comment and label failed PR

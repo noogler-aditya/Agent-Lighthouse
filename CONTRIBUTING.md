@@ -53,7 +53,6 @@ Your PR should pass:
 - Backend quality checks + tests
 - SDK matrix quality checks + tests
 - Integration smoke test
-- Container vulnerability scan
 
 These checks run in GitHub Actions (`.github/workflows/ci.yml`).
 
