@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "Agent Lighthouse", email = "lighthouse@example.com"}
+    {name = "Agent Lighthouse Contributors", email = "maintainers@agent-lighthouse.dev"}
 ]
 keywords = ["agents", "multi-agent", "observability", "tracing", "debugging"]
 classifiers = [
@@ -34,9 +34,15 @@ dependencies = [
 [project.optional-dependencies]
 crewai = ["crewai>=0.1.0"]
 langgraph = ["langgraph>=0.0.1"]
-dev = ["pytest", "pytest-asyncio"]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.8.0",
+    "bandit>=1.8.0",
+]
 
 [project.urls]
-Homepage = "https://github.com/example/agent-lighthouse"
-Documentation = "https://agent-lighthouse.dev"
-Repository = "https://github.com/example/agent-lighthouse"
+Homepage = "https://github.com/noogler-aditya/Agent-Lighthouse"
+Documentation = "https://github.com/noogler-aditya/Agent-Lighthouse#readme"
+Repository = "https://github.com/noogler-aditya/Agent-Lighthouse"
