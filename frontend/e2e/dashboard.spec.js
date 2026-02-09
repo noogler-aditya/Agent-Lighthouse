@@ -73,5 +73,6 @@ test('dashboard loads traces, supports ws updates, and refreshes session', async
   await expect(refreshedToolCard).toHaveText('1');
 
   await page.getByRole('button', { name: /state/i }).click();
-  await expect(page.getByText(/No state available|State is captured/i)).toBeVisible();
+  await expect(page.getByText('No state available')).toBeVisible();
+  await expect(page.locator('.no-state .hint')).toContainText('State is captured when the agent is paused');
 });

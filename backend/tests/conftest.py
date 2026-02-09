@@ -129,6 +129,12 @@ def client_and_store():
 
     original_lifespan = app.router.lifespan_context
     app.router.lifespan_context = _no_op_lifespan
+    original_redis_service = getattr(app.state, "redis_service", None)
+    original_connection_manager = getattr(app.state, "connection_manager", None)
+    original_settings = getattr(app.state, "settings", None)
+    app.state.redis_service = fake_redis
+    app.state.connection_manager = fake_manager
+    app.state.settings = get_settings()
     app.dependency_overrides[get_redis] = lambda: fake_redis
     app.dependency_overrides[get_connection_manager] = lambda: fake_manager
 
@@ -137,3 +143,17 @@ def client_and_store():
 
     app.dependency_overrides.clear()
     app.router.lifespan_context = original_lifespan
+    if original_redis_service is not None:
+        app.state.redis_service = original_redis_service
+    else:
+        app.state._state.pop("redis_service", None)
+
+    if original_connection_manager is not None:
+        app.state.connection_manager = original_connection_manager
+    else:
+        app.state._state.pop("connection_manager", None)
+
+    if original_settings is not None:
+        app.state.settings = original_settings
+    else:
+        app.state._state.pop("settings", None)

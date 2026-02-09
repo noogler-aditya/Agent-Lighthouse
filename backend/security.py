@@ -203,8 +203,9 @@ def require_user_or_machine(minimum_role: str, scope: str) -> Callable:
 
         if authorization:
             try:
-                principal = _user_principal(authorization, settings)
-                _ensure_role(principal, minimum_role)
+                candidate = _user_principal(authorization, settings)
+                _ensure_role(candidate, minimum_role)
+                principal = candidate
             except Exception as exc:  # noqa: BLE001
                 user_auth_error = exc
 
