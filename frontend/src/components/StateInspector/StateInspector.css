@@ -3,6 +3,7 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    min-height: 0;
 }
 
 .state-inspector.empty {
@@ -12,7 +13,7 @@
 }
 
 .empty-text {
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
@@ -22,8 +23,9 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--space-md);
-    background: var(--bg-tertiary);
+    background: linear-gradient(180deg, rgba(23, 35, 61, 0.95) 0%, rgba(18, 27, 47, 0.95) 100%);
     border-bottom: 1px solid var(--border-primary);
+    box-shadow: inset 0 1px 0 rgba(157, 178, 216, 0.1);
 }
 
 .control-status {
@@ -39,15 +41,16 @@
 /* State Tabs */
 .state-tabs {
     padding: var(--space-sm) var(--space-md);
-    background: var(--bg-secondary);
+    background: rgba(16, 24, 42, 0.9);
     border-bottom: 1px solid var(--border-primary);
 }
 
 /* State Content */
 .state-content {
     flex: 1;
-    overflow: hidden;
+    overflow: auto;
     position: relative;
+    min-height: 0;
 }
 
 .loading,
@@ -57,7 +60,7 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     gap: var(--space-sm);
 }
 
@@ -70,6 +73,7 @@
     height: 100%;
     overflow: auto;
     padding: var(--space-md);
+    background: rgba(12, 19, 35, 0.82);
 }
 
 .json-viewer pre {
@@ -84,6 +88,7 @@
 
 .editor-container {
     height: 100%;
+    border-top: 1px solid rgba(108, 129, 174, 0.2);
 }
 
 /* State Actions */
@@ -91,8 +96,9 @@
     display: flex;
     gap: var(--space-sm);
     padding: var(--space-md);
-    background: var(--bg-tertiary);
+    background: linear-gradient(180deg, rgba(19, 29, 50, 0.95) 0%, rgba(15, 22, 40, 0.95) 100%);
     border-top: 1px solid var(--border-primary);
+    box-shadow: inset 0 1px 0 rgba(157, 178, 216, 0.08);
 }
 
 .state-actions .btn {
@@ -102,7 +108,7 @@
 /* Snapshots Section */
 .snapshots-section {
     padding: var(--space-md);
-    background: var(--bg-tertiary);
+    background: rgba(18, 27, 47, 0.95);
     border-top: 1px solid var(--border-primary);
     max-height: 150px;
     overflow-y: auto;
@@ -126,9 +132,16 @@
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-xs) var(--space-sm);
-    background: var(--bg-secondary);
+    background: rgba(23, 34, 58, 0.92);
+    border: 1px solid rgba(108, 129, 174, 0.2);
     border-radius: var(--radius-sm);
     font-size: 12px;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.snapshot-item:hover {
+    border-color: var(--border-secondary);
+    background: rgba(28, 41, 69, 0.95);
 }
 
 .snapshot-index {

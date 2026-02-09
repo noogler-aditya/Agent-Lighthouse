@@ -51,7 +51,7 @@ export default function StateInspector({
     return (
         <div className="state-inspector">
             {/* Execution Controls */}
-            <div className="control-panel">
+            <div className="control-panel" data-animate="enter" data-delay="1">
                 <div className="control-status">
                     <span className={`status-badge ${controlStatus}`}>
                         {controlStatus === 'running' ? 'Running' :
@@ -90,7 +90,7 @@ export default function StateInspector({
             </div>
 
             {/* State Tabs */}
-            <div className="state-tabs">
+            <div className="state-tabs" data-animate="enter" data-delay="2">
                 <div className="tabs">
                     {['memory', 'context', 'variables', 'messages'].map(tab => (
                         <button
@@ -113,7 +113,7 @@ export default function StateInspector({
             </div>
 
             {/* State Content */}
-            <div className="state-content">
+            <div className="state-content" data-animate="enter" data-delay="2">
                 {loading ? (
                     <div className="loading">Loading...</div>
                 ) : !state ? (
@@ -147,7 +147,7 @@ export default function StateInspector({
             </div>
 
             {/* Edit Actions */}
-            <div className="state-actions">
+            <div className="state-actions" data-animate="enter" data-delay="3">
                 {editMode ? (
                     <>
                         <button className="btn btn-secondary" onClick={() => setEditMode(false)}>
@@ -174,7 +174,7 @@ export default function StateInspector({
 
             {/* Snapshots */}
             {state?.snapshots?.length > 0 && (
-                <div className="snapshots-section">
+                <div className="snapshots-section" data-animate="enter" data-delay="3">
                     <h4 className="section-title">State Snapshots</h4>
                     <div className="snapshots-list">
                         {state.snapshots.map((snap, idx) => (

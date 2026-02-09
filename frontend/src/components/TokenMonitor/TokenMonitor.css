@@ -4,6 +4,10 @@
     flex-direction: column;
     gap: var(--space-md);
     overflow-y: auto;
+    height: 100%;
+    min-height: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .token-monitor.empty {
@@ -14,7 +18,7 @@
 }
 
 .empty-text {
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
@@ -30,9 +34,21 @@
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-md);
-    background: var(--bg-tertiary);
+    background: linear-gradient(180deg, rgba(25, 37, 64, 0.92) 0%, rgba(20, 30, 52, 0.92) 100%);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    transition:
+        transform var(--transition-fast),
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast),
+        background-color var(--transition-fast);
+}
+
+.metric-card:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-secondary);
+    box-shadow: var(--shadow-md);
 }
 
 .metric-icon {
@@ -44,6 +60,7 @@
 .metric-content {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .metric-value {
@@ -54,43 +71,86 @@
 
 .metric-label {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 /* Chart Sections */
 .chart-section {
-    background: var(--bg-tertiary);
+    background: linear-gradient(180deg, rgba(22, 33, 57, 0.94) 0%, rgba(19, 29, 50, 0.9) 100%);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-md);
     padding: var(--space-md);
+    box-shadow: var(--shadow-sm);
 }
 
 .section-title {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: var(--space-md);
+    letter-spacing: 0.01em;
 }
 
 .chart-container {
     width: 100%;
 }
 
+.chart-legend {
+    margin-top: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.legend-item {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    min-width: 0;
+    padding: 2px 0;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.legend-name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.legend-meta {
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
 /* Burn Rate */
 .burn-rate {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, var(--bg-tertiary) 100%);
-    border: 1px solid var(--accent-primary);
+    background: linear-gradient(135deg, rgba(91, 124, 255, 0.2) 0%, rgba(22, 33, 57, 0.9) 100%);
+    border: 1px solid rgba(91, 124, 255, 0.5);
     border-radius: var(--radius-md);
     padding: var(--space-md);
     text-align: center;
+    box-shadow: inset 0 1px 0 rgba(193, 210, 246, 0.16);
 }
 
 .burn-rate-title {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     text-transform: uppercase;
     margin-bottom: var(--space-xs);
+    letter-spacing: 0.05em;
 }
 
 .burn-rate-value {
@@ -111,7 +171,33 @@
     font-size: 11px;
 }
 
-.recharts-pie-label-text {
-    fill: var(--text-primary);
-    font-size: 10px;
+.recharts-tooltip-wrapper {
+    outline: none;
+}
+
+.token-tooltip {
+    background: rgba(11, 17, 31, 0.98);
+    border: 1px solid rgba(108, 133, 184, 0.55);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 8px 10px;
+    color: var(--text-primary);
+}
+
+.token-tooltip-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 3px;
+}
+
+.token-tooltip-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+@media (max-width: 600px) {
+    .metrics-summary {
+        grid-template-columns: 1fr;
+    }
 }

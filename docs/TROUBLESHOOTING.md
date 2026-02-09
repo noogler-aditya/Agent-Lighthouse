@@ -5,14 +5,17 @@
 Use this sequence to determine whether it is truly empty data or a hidden error.
 
 1. Verify backend health:
-   - `curl -H "X-API-Key: <key>" http://localhost:8000/health`
+   - `curl http://localhost:8000/health/live`
+   - `curl http://localhost:8000/health/ready`
 2. Verify traces endpoint:
-   - `curl -H "X-API-Key: <key>" http://localhost:8000/api/traces`
+   - `TOKEN=$(curl -s http://localhost:8000/api/auth/login -H "Content-Type: application/json" -d '{"username":"viewer","password":"viewer"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")`
+   - `curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/traces`
 3. Verify frontend env:
    - `VITE_API_URL` points to backend
-   - `VITE_API_KEY` matches backend key
+   - optional `VITE_AUTH_USERNAME`/`VITE_AUTH_PASSWORD` are valid
 4. Verify backend env:
-   - `LIGHTHOUSE_API_KEY` set
+   - `JWT_SECRET` and `AUTH_USERS` are set
+   - `MACHINE_API_KEYS` includes SDK scope if SDK ingestion is used
    - `ALLOWED_ORIGINS` includes `http://localhost:5173`
 
 ## `pydantic_settings` Error Parsing `allowed_origins`
@@ -42,7 +45,7 @@ LIGHTHOUSE_API_KEY=local-dev-key LIGHTHOUSE_BASE_URL=http://localhost:8000 pytho
 If it fails:
 
 - confirm backend is running on the same URL
-- confirm API key matches backend
+- confirm machine key in `LIGHTHOUSE_API_KEY` is present in `MACHINE_API_KEYS`
 - inspect backend logs for auth/Redis errors
 
 ## CI Fails on Pull Request

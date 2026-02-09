@@ -10,7 +10,8 @@
 ## Request and Data Flow
 
 1. Agent code uses SDK to create traces/spans/state updates.
-2. SDK sends authenticated requests to backend (`X-API-Key`).
+2. SDK sends scoped machine requests to backend (`X-API-Key` with ingestion scopes).
+3. UI/session traffic uses JWT bearer auth (`Authorization: Bearer <token>`).
 3. Backend validates input, persists entities in Redis, and broadcasts updates.
 4. Frontend pulls trace lists and subscribes to live updates via WebSocket.
 5. User inspects graph, token metrics, and agent state from dashboard.

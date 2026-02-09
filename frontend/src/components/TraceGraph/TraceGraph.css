@@ -182,7 +182,9 @@
 .trace-graph-container {
     width: 100%;
     height: 100%;
-    background: var(--bg-primary);
+    background:
+        radial-gradient(110% 80% at 50% -25%, rgba(91, 124, 255, 0.2) 0%, rgba(91, 124, 255, 0) 72%),
+        linear-gradient(180deg, rgba(10, 17, 31, 0.98) 0%, rgba(8, 13, 25, 0.98) 100%);
 }
 
 .trace-graph-empty {
@@ -193,19 +195,54 @@
     height: 100%;
     color: var(--text-muted);
     gap: var(--space-md);
+    background:
+        radial-gradient(60% 45% at 50% 40%, rgba(91, 124, 255, 0.18) 0%, rgba(91, 124, 255, 0) 100%),
+        transparent;
 }
 
 .trace-graph-empty .empty-icon {
     width: 48px;
     height: 48px;
-    opacity: 0.5;
+    opacity: 0.65;
+    color: var(--accent-secondary);
+    filter: drop-shadow(0 0 10px rgba(64, 196, 255, 0.25));
 }
 
 .trace-graph-empty .empty-text {
-    font-size: 16px;
+    font-size: 18px;
+    color: var(--text-primary);
+    font-weight: 620;
 }
 
 .trace-graph-empty .empty-hint {
     font-size: 13px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
+}
+
+.trace-graph-container .react-flow__panel {
+    background: rgba(18, 27, 47, 0.9);
+    border: 1px solid rgba(108, 129, 174, 0.35);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(4px);
+}
+
+.trace-graph-container .react-flow__controls {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.trace-graph-container .react-flow__controls-button {
+    border: none;
+    color: var(--text-secondary);
+}
+
+.trace-graph-container .react-flow__controls-button:hover {
+    color: var(--text-primary);
+}
+
+.trace-graph-container .react-flow__minimap {
+    border: none;
+    background: transparent !important;
 }

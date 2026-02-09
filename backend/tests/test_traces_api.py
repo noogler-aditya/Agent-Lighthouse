@@ -1,13 +1,13 @@
 from config import Settings
 
 
-def test_traces_endpoint_requires_api_key(client_and_store):
+def test_traces_endpoint_requires_authorization(client_and_store):
     client, _, _ = client_and_store
 
     response = client.get("/api/traces")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Invalid or missing API key"
+    assert response.json()["detail"] == "Unauthorized"
 
 
 def test_create_and_list_trace(client_and_store, auth_headers):

@@ -7,6 +7,7 @@ export default function Sidebar({
     selectedTraceId,
     onSelectTrace,
     onDeleteTrace,
+    canDeleteTraces = false,
     loading,
     isConnected,
     errorCode,
@@ -33,7 +34,7 @@ export default function Sidebar({
 
     const getErrorHint = () => {
         if (errorCode === 401 || errorCode === 403) {
-            return 'API key missing/invalid (check VITE_API_KEY and LIGHTHOUSE_API_KEY)';
+            return 'Session expired or unauthorized. Sign in again and verify backend auth settings.';
         }
         if (errorCode === 'NETWORK') {
             return 'Backend unreachable at configured VITE_API_URL';
@@ -47,9 +48,9 @@ export default function Sidebar({
     };
 
     return (
-        <div className="sidebar">
+        <div className="sidebar" data-animate="enter">
             {/* Header */}
-            <div className="sidebar-header">
+            <div className="sidebar-header" data-animate="enter" data-delay="1">
                 <div className="logo">
                     <Radar className="ui-icon logo-icon" />
                     <span className="logo-text">Agent Lighthouse</span>
@@ -61,7 +62,7 @@ export default function Sidebar({
             </div>
 
             {/* Search */}
-            <div className="sidebar-search">
+            <div className="sidebar-search" data-animate="enter" data-delay="2">
                 <input
                     type="search"
                     placeholder="Search traces..."
@@ -75,7 +76,7 @@ export default function Sidebar({
                 {loading && filteredTraces.length === 0 && !errorMessage ? (
                     <div className="list-empty">Loading traces...</div>
                 ) : errorMessage ? (
-                    <div className="list-error">
+                    <div className="list-error" data-animate="enter" data-delay="1">
                         <div className="list-error-title">Could not load traces</div>
                         <div className="list-error-hint">{getErrorHint()}</div>
                         <div className="list-error-meta">
@@ -92,11 +93,13 @@ export default function Sidebar({
                         {search ? 'No matching traces' : 'No traces yet'}
                     </div>
                 ) : (
-                    filteredTraces.map(trace => (
+                    filteredTraces.map((trace, index) => (
                         <div
                             key={trace.trace_id}
                             className={`trace-item ${selectedTraceId === trace.trace_id ? 'selected' : ''}`}
                             onClick={() => onSelectTrace(trace.trace_id)}
+                            data-animate="enter"
+                            data-delay={String((index % 3) + 1)}
                         >
                             <div className="trace-header">
                                 <span className="trace-name">{trace.name}</span>
@@ -126,7 +129,7 @@ export default function Sidebar({
                                     ${trace.total_cost_usd.toFixed(4)}
                                 </span>
                             </div>
-                            {onDeleteTrace && (
+                            {onDeleteTrace && canDeleteTraces && (
                                 <button
                                     className="delete-btn"
                                     onClick={(e) => {

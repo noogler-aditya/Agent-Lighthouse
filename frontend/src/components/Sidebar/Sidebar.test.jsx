@@ -36,7 +36,7 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('Could not load traces')).toBeInTheDocument();
     expect(
-      screen.getByText(/API key missing\/invalid \(check VITE_API_KEY and LIGHTHOUSE_API_KEY\)/)
+      screen.getByText(/Session expired or unauthorized/i)
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));

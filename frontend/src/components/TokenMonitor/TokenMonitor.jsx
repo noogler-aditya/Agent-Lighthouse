@@ -58,32 +58,53 @@ export default function TokenMonitor({ trace }) {
         );
     }
 
+    const formatPercent = (value) => {
+        if (!metrics.totalTokens) return '0%';
+        return `${((value / metrics.totalTokens) * 100).toFixed(0)}%`;
+    };
+
+    const renderTooltip = ({ active, payload, label }) => {
+        if (!active || !payload || payload.length === 0) return null;
+        const entry = payload[0];
+        const name = entry?.payload?.name || label || entry.name;
+        const value = Number(entry?.value || 0);
+        const metricLabel = entry.name?.toLowerCase().includes('cost') ? 'Cost' : 'Tokens';
+        return (
+            <div className="token-tooltip" role="tooltip">
+                <div className="token-tooltip-label">{name}</div>
+                <div className="token-tooltip-value">
+                    {metricLabel === 'Cost' ? `$${value.toFixed(4)}` : value.toLocaleString()} {metricLabel}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="token-monitor">
             {/* Summary Cards */}
             <div className="metrics-summary">
-                <div className="metric-card">
+                <div className="metric-card" data-animate="enter" data-delay="1">
                     <Hash className="ui-icon metric-icon" />
                     <div className="metric-content">
                         <div className="metric-value">{metrics.totalTokens.toLocaleString()}</div>
                         <div className="metric-label">Total Tokens</div>
                     </div>
                 </div>
-                <div className="metric-card">
+                <div className="metric-card" data-animate="enter" data-delay="2">
                     <Coins className="ui-icon metric-icon" />
                     <div className="metric-content">
                         <div className="metric-value">${metrics.totalCost.toFixed(4)}</div>
                         <div className="metric-label">Total Cost</div>
                     </div>
                 </div>
-                <div className="metric-card">
+                <div className="metric-card" data-animate="enter" data-delay="3">
                     <Cpu className="ui-icon metric-icon" />
                     <div className="metric-content">
                         <div className="metric-value">{metrics.llmCalls}</div>
                         <div className="metric-label">LLM Calls</div>
                     </div>
                 </div>
-                <div className="metric-card">
+                <div className="metric-card" data-animate="enter" data-delay="1">
                     <Wrench className="ui-icon metric-icon" />
                     <div className="metric-content">
                         <div className="metric-value">{metrics.toolCalls}</div>
@@ -94,57 +115,81 @@ export default function TokenMonitor({ trace }) {
 
             {/* Agent Cost Breakdown */}
             {metrics.agentBreakdown.length > 0 && (
-                <div className="chart-section">
+                <div className="chart-section" data-animate="enter" data-delay="2">
                     <h3 className="section-title">Token Distribution by Agent</h3>
                     <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={200}>
+                        <ResponsiveContainer width="100%" height={220}>
                             <PieChart>
                                 <Pie
                                     data={metrics.agentBreakdown}
                                     dataKey="tokens"
                                     nameKey="name"
                                     cx="50%"
-                                    cy="50%"
-                                    outerRadius={70}
-                                    innerRadius={40}
-                                    paddingAngle={2}
-                                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                    cy="48%"
+                                    outerRadius={78}
+                                    innerRadius={46}
+                                    paddingAngle={3}
                                     labelLine={false}
                                 >
                                     {metrics.agentBreakdown.map((entry, index) => (
-                                        <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                                        <Cell
+                                            key={entry.name}
+                                            fill={COLORS[index % COLORS.length]}
+                                            stroke="#0f1327"
+                                            strokeWidth={2}
+                                        />
                                     ))}
                                 </Pie>
                                 <Tooltip
-                                    contentStyle={{
-                                        background: '#1a1a26',
-                                        border: '1px solid #2d2d3d',
-                                        borderRadius: '8px',
-                                    }}
-                                    formatter={(value) => [value.toLocaleString(), 'Tokens']}
+                                    content={renderTooltip}
+                                    cursor={{ fill: 'rgba(99, 102, 241, 0.14)' }}
                                 />
                             </PieChart>
                         </ResponsiveContainer>
+                    </div>
+                    <div className="chart-legend">
+                        {metrics.agentBreakdown.map((entry, index) => (
+                            <div key={entry.name} className="legend-item">
+                                <span
+                                    className="legend-dot"
+                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                />
+                                <span className="legend-name">{entry.name}</span>
+                                <span className="legend-meta">
+                                    {entry.tokens.toLocaleString()} tokens ({formatPercent(entry.tokens)})
+                                </span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
 
             {/* Cost Bar Chart */}
             {metrics.agentBreakdown.length > 0 && (
-                <div className="chart-section">
+                <div className="chart-section" data-animate="enter" data-delay="3">
                     <h3 className="section-title">Cost by Agent</h3>
                     <div className="chart-container">
                         <ResponsiveContainer width="100%" height={150}>
-                            <BarChart data={metrics.agentBreakdown} layout="vertical">
-                                <XAxis type="number" tickFormatter={(v) => `$${v.toFixed(3)}`} stroke="#64748b" />
-                                <YAxis type="category" dataKey="name" width={80} stroke="#64748b" />
+                            <BarChart
+                                data={metrics.agentBreakdown}
+                                layout="vertical"
+                                margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                            >
+                                <XAxis
+                                    type="number"
+                                    tickFormatter={(v) => `$${v.toFixed(3)}`}
+                                    stroke="#64748b"
+                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                />
+                                <YAxis
+                                    type="category"
+                                    dataKey="name"
+                                    width={130}
+                                    stroke="#64748b"
+                                    tick={{ fill: '#cbd5e1', fontSize: 11 }}
+                                />
                                 <Tooltip
-                                    contentStyle={{
-                                        background: '#1a1a26',
-                                        border: '1px solid #2d2d3d',
-                                        borderRadius: '8px',
-                                    }}
-                                    formatter={(value) => [`$${value.toFixed(4)}`, 'Cost']}
+                                    content={renderTooltip}
                                 />
                                 <Bar dataKey="cost" fill="#6366f1" radius={[0, 4, 4, 0]} />
                             </BarChart>
@@ -155,7 +200,7 @@ export default function TokenMonitor({ trace }) {
 
             {/* Burn Rate Indicator */}
             {trace.duration_ms > 0 && (
-                <div className="burn-rate">
+                <div className="burn-rate" data-animate="enter" data-delay="2">
                     <div className="burn-rate-title">Burn Rate</div>
                     <div className="burn-rate-value">
                         {((metrics.totalTokens / (trace.duration_ms / 1000)) * 60).toFixed(0)} tokens/min

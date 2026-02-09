@@ -195,6 +195,8 @@ class LighthouseClient:
                 "variables": variables or {},
             },
         )
+        if response.status_code in (401, 403):
+            return {"skipped": True, "reason": "state endpoint unauthorized for this credential"}
         response.raise_for_status()
         return response.json()
     
@@ -215,15 +217,23 @@ class LighthouseClient:
             data["variables"] = variables
         
         response = self.client.put(f"/api/state/{trace_id}", json=data)
+        if response.status_code in (401, 403):
+            return {"skipped": True, "reason": "state endpoint unauthorized for this credential"}
         if response.status_code == 404:
             self.initialize_state(trace_id=trace_id, memory=memory, context=context, variables=variables)
             response = self.client.put(f"/api/state/{trace_id}", json=data)
+            if response.status_code in (401, 403):
+                return {"skipped": True, "reason": "state endpoint unauthorized for this credential"}
         response.raise_for_status()
         return response.json()
     
     def get_control_status(self, trace_id: str) -> dict:
         """Check if execution is paused"""
         response = self.client.get(f"/api/state/{trace_id}/control")
+        if response.status_code in (401, 403):
+            return {"status": "running", "resume_requested": False, "auth_restricted": True}
+        if response.status_code == 404:
+            return {"status": "running", "resume_requested": False}
         response.raise_for_status()
         return response.json()
     
