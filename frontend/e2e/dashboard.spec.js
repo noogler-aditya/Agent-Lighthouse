@@ -18,7 +18,7 @@ async function loginViaUi(page, username, password) {
   await page.getByPlaceholder('••••••••').fill(password);
 
   // Click 'Sign In' inside the modal (submit button)
-  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await page.locator('.auth-form').getByRole('button', { name: 'Sign In' }).click();
 
   await expect(page.getByText('Select a trace to begin')).toBeVisible();
 }
