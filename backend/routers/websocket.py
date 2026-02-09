@@ -2,7 +2,9 @@
 WebSocket router for real-time updates
 """
 import json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
+from rate_limit import enforce_ws_connect_limit_for_subject, enforce_ws_subscribe_limit_for_subject
+from security import AuthError
 from security import authenticate_websocket
 
 
@@ -19,11 +21,18 @@ async def websocket_endpoint(websocket: WebSocket):
     - Unsubscribe from traces: {"action": "unsubscribe", "trace_id": "xxx"}
     - Ping: {"action": "ping"}
     """
-    if not await authenticate_websocket(websocket):
+    try:
+        principal = await authenticate_websocket(websocket, minimum_role="viewer")
+        await enforce_ws_connect_limit_for_subject(websocket, principal.subject)
+    except AuthError:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized")
+        return
+    except HTTPException:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Rate limit exceeded")
         return
 
     manager = websocket.app.state.connection_manager
-    await manager.connect(websocket)
+    await manager.connect(websocket, subprotocol="bearer")
     
     try:
         # Send initial connection acknowledgment
@@ -43,6 +52,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 if action == "subscribe":
                     trace_id = message.get("trace_id")
                     if trace_id:
+                        try:
+                            await enforce_ws_subscribe_limit_for_subject(websocket, principal.subject)
+                        except HTTPException:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": "Rate limit exceeded for subscriptions",
+                            })
+                            continue
                         manager.subscribe_to_trace(websocket, trace_id)
                         await websocket.send_json({
                             "type": "subscribed",
@@ -83,11 +100,23 @@ async def trace_websocket(websocket: WebSocket, trace_id: str):
     WebSocket endpoint for a specific trace.
     Automatically subscribes to updates for the given trace.
     """
-    if not await authenticate_websocket(websocket):
+    try:
+        principal = await authenticate_websocket(websocket, minimum_role="viewer")
+        await enforce_ws_connect_limit_for_subject(websocket, principal.subject)
+    except AuthError:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized")
+        return
+    except HTTPException:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Rate limit exceeded")
         return
 
     manager = websocket.app.state.connection_manager
-    await manager.connect(websocket)
+    await manager.connect(websocket, subprotocol="bearer")
+    try:
+        await enforce_ws_subscribe_limit_for_subject(websocket, principal.subject)
+    except HTTPException:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Rate limit exceeded")
+        return
     manager.subscribe_to_trace(websocket, trace_id)
     
     try:

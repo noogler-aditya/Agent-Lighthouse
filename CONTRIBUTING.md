@@ -22,14 +22,16 @@ docker-compose up --build
 # Backend
 cd backend
 pip install -r requirements.txt
-export LIGHTHOUSE_API_KEY=local-dev-key
+export JWT_SECRET=dev-secret
+export MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
 export ALLOWED_ORIGINS=http://localhost:5173
 python3 -m uvicorn main:app --reload --port 8000
 
 # Frontend (new terminal)
 cd frontend
 npm install
-export VITE_API_KEY=local-dev-key
+export VITE_AUTH_USERNAME=viewer
+export VITE_AUTH_PASSWORD=viewer
 npm run dev
 
 # SDK smoke check

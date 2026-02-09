@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 
 from dependencies import get_connection_manager, get_redis
 from models.state import AgentState, ExecutionControl
-from security import require_api_key
+from rate_limit import enforce_read_rate_limit, enforce_write_rate_limit
+from security import require_role
 from services.connection_manager import ConnectionManager
 from services.redis_service import RedisService
 
@@ -15,7 +16,6 @@ from services.redis_service import RedisService
 router = APIRouter(
     prefix="/api/state",
     tags=["state"],
-    dependencies=[Depends(require_api_key)],
 )
 
 
@@ -58,7 +58,9 @@ async def _ensure_trace_exists(trace_id: str, redis: RedisService):
 @router.get("/{trace_id}")
 async def get_state(
     trace_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("viewer")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """Get current state for a trace"""
     state = await redis.get_state(trace_id)
@@ -71,7 +73,9 @@ async def get_state(
 async def initialize_state(
     trace_id: str,
     request: InitStateRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Initialize state for a trace"""
     # Check trace exists
@@ -96,6 +100,8 @@ async def modify_state(
     request: ModifyStateRequest,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Modify a specific path in the state"""
     state = await redis.get_state(trace_id)
@@ -128,6 +134,8 @@ async def bulk_modify_state(
     request: BulkModifyStateRequest,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Bulk modify state containers"""
     state = await redis.get_state(trace_id)
@@ -165,6 +173,8 @@ async def pause_execution(
     span_id: Optional[str] = None,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Pause execution at the current point"""
     await _ensure_trace_exists(trace_id, redis)
@@ -193,6 +203,8 @@ async def resume_execution(
     trace_id: str,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Resume paused execution"""
     state = await redis.get_state(trace_id)
@@ -217,6 +229,8 @@ async def step_execution(
     request: StepRequest,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Execute N steps then pause"""
     state = await redis.get_state(trace_id)
@@ -237,7 +251,9 @@ async def step_execution(
 @router.get("/{trace_id}/control")
 async def get_control_status(
     trace_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("viewer")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """Get current execution control status"""
     state = await redis.get_state(trace_id)
@@ -259,7 +275,9 @@ async def get_control_status(
 async def set_breakpoints(
     trace_id: str,
     request: BreakpointRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Set breakpoints for debugging"""
     await _ensure_trace_exists(trace_id, redis)
@@ -288,7 +306,9 @@ async def take_snapshot(
     trace_id: str,
     span_id: str,
     description: Optional[str] = None,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Take a snapshot of current state"""
     state = await redis.get_state(trace_id)
@@ -304,7 +324,9 @@ async def take_snapshot(
 @router.get("/{trace_id}/snapshots")
 async def list_snapshots(
     trace_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("viewer")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """List all state snapshots for a trace"""
     state = await redis.get_state(trace_id)
@@ -320,6 +342,8 @@ async def restore_snapshot(
     snapshot_id: str,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Restore state from a snapshot"""
     state = await redis.get_state(trace_id)

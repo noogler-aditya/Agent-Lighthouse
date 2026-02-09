@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { API_KEY, WS_URL } from '../config';
+import { WS_URL } from '../config';
+import { getAccessToken, refreshSession } from '../auth/session';
 
-export function useWebSocket() {
+export function useWebSocket(enabled = true) {
     const [isConnected, setIsConnected] = useState(false);
     const [lastMessage, setLastMessage] = useState(null);
     const wsRef = useRef(null);
@@ -10,14 +11,22 @@ export function useWebSocket() {
     const shouldReconnectRef = useRef(true);
     const messageHandlersRef = useRef(new Map());
 
-    const connect = useCallback(() => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    const connect = useCallback(async () => {
+        if (!enabled || wsRef.current?.readyState === WebSocket.OPEN) return;
+
+        let token = getAccessToken();
+        if (!token) {
+            try {
+                await refreshSession();
+                token = getAccessToken();
+            } catch {
+                setIsConnected(false);
+                return;
+            }
+        }
 
         const endpoint = new URL(WS_URL, window.location.origin);
-        if (API_KEY) {
-            endpoint.searchParams.set('api_key', API_KEY);
-        }
-        const ws = new WebSocket(endpoint.toString());
+        const ws = new WebSocket(endpoint.toString(), ['bearer', token]);
 
         ws.onopen = () => {
             setIsConnected(true);
@@ -32,7 +41,7 @@ export function useWebSocket() {
             wsRef.current = null;
             if (shouldReconnectRef.current) {
                 reconnectTimeoutRef.current = setTimeout(() => {
-                    connectRef.current?.();
+                    connectRef.current?.().catch(() => {});
                 }, 3000);
             }
         };
@@ -58,7 +67,7 @@ export function useWebSocket() {
         };
 
         wsRef.current = ws;
-    }, []);
+    }, [enabled]);
 
     useEffect(() => {
         connectRef.current = connect;
@@ -106,10 +115,19 @@ export function useWebSocket() {
     }, []);
 
     useEffect(() => {
+        if (!enabled) {
+            disconnect();
+            return;
+        }
         shouldReconnectRef.current = true;
-        connect();
-        return disconnect;
-    }, [connect, disconnect]);
+        const timer = window.setTimeout(() => {
+            connectRef.current?.().catch(() => {});
+        }, 0);
+        return () => {
+            window.clearTimeout(timer);
+            disconnect();
+        };
+    }, [connect, disconnect, enabled]);
 
     return {
         isConnected,

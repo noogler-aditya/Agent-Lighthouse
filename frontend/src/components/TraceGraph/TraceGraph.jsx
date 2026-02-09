@@ -124,7 +124,7 @@ export default function TraceGraph({ trace, onSpanClick }) {
 
     if (!trace) {
         return (
-            <div className="trace-graph-empty">
+            <div className="trace-graph-empty" data-animate="enter" data-delay="1">
                 <Search className="ui-icon empty-icon" />
                 <div className="empty-text">No trace selected</div>
                 <div className="empty-hint">Select a trace from the sidebar to visualize</div>
@@ -133,7 +133,7 @@ export default function TraceGraph({ trace, onSpanClick }) {
     }
 
     return (
-        <div className="trace-graph-container">
+        <div className="trace-graph-container" data-animate="enter">
             <ReactFlow
                 nodes={nodes}
                 edges={edges}

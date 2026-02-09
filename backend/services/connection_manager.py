@@ -18,9 +18,9 @@ class ConnectionManager:
         # Trace-specific subscriptions
         self.trace_subscriptions: dict[str, list[WebSocket]] = {}
     
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, subprotocol: Optional[str] = None):
         """Accept a new WebSocket connection"""
-        await websocket.accept()
+        await websocket.accept(subprotocol=subprotocol)
         self.active_connections.append(websocket)
     
     def disconnect(self, websocket: WebSocket):

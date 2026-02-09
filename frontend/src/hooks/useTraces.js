@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_HEADERS, API_URL } from '../config';
+import { API_URL } from '../config';
+import { authFetch } from '../auth/session';
 
 function computeTraceTotals(spans = []) {
     return spans.reduce(
@@ -22,7 +23,7 @@ function computeTraceTotals(spans = []) {
     );
 }
 
-export function useTraces() {
+export function useTraces(enabled = true) {
     const [traces, setTraces] = useState([]);
     const [selectedTrace, setSelectedTrace] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -57,9 +58,10 @@ export function useTraces() {
     }, []);
 
     const fetchTraces = useCallback(async () => {
+        if (!enabled) return;
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/traces`, { headers: API_HEADERS });
+            const res = await authFetch(`${API_URL}/traces`);
             if (!res.ok) {
                 const message = await parseErrorResponse(res, 'Failed to fetch traces');
                 setStructuredError(res.status, message);
@@ -74,12 +76,13 @@ export function useTraces() {
             setLastFetchAt(new Date().toISOString());
             setLoading(false);
         }
-    }, [clearError, parseErrorResponse, setStructuredError]);
+    }, [clearError, enabled, parseErrorResponse, setStructuredError]);
 
     const fetchTrace = useCallback(async (traceId) => {
+        if (!enabled) return null;
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/traces/${traceId}`, { headers: API_HEADERS });
+            const res = await authFetch(`${API_URL}/traces/${traceId}`);
             if (!res.ok) {
                 const message = await parseErrorResponse(res, 'Failed to fetch trace');
                 setStructuredError(res.status, message);
@@ -95,11 +98,12 @@ export function useTraces() {
         } finally {
             setLoading(false);
         }
-    }, [clearError, parseErrorResponse, setStructuredError]);
+    }, [clearError, enabled, parseErrorResponse, setStructuredError]);
 
     const fetchTraceTree = useCallback(async (traceId) => {
+        if (!enabled) return null;
         try {
-            const res = await fetch(`${API_URL}/traces/${traceId}/tree`, { headers: API_HEADERS });
+            const res = await authFetch(`${API_URL}/traces/${traceId}/tree`);
             if (!res.ok) {
                 const message = await parseErrorResponse(res, 'Failed to fetch trace tree');
                 setStructuredError(res.status, message);
@@ -111,13 +115,13 @@ export function useTraces() {
             setStructuredError('NETWORK', e.message || 'Network error while fetching trace tree');
             return null;
         }
-    }, [clearError, parseErrorResponse, setStructuredError]);
+    }, [clearError, enabled, parseErrorResponse, setStructuredError]);
 
     const deleteTrace = useCallback(async (traceId) => {
+        if (!enabled) return;
         try {
-            const response = await fetch(`${API_URL}/traces/${traceId}`, {
+            const response = await authFetch(`${API_URL}/traces/${traceId}`, {
                 method: 'DELETE',
-                headers: API_HEADERS,
             });
             if (!response.ok) {
                 const message = await parseErrorResponse(response, 'Failed to delete trace');
@@ -132,7 +136,7 @@ export function useTraces() {
         } catch (e) {
             setStructuredError('NETWORK', e.message || 'Network error while deleting trace');
         }
-    }, [clearError, parseErrorResponse, selectedTrace, setStructuredError]);
+    }, [clearError, enabled, parseErrorResponse, selectedTrace, setStructuredError]);
 
     const updateTraceInList = useCallback((updatedTrace) => {
         setTraces(prev => prev.map(t =>
@@ -181,8 +185,8 @@ export function useTraces() {
     }, []);
 
     useEffect(() => {
-        fetchTraces();
-    }, [fetchTraces]);
+        if (enabled) fetchTraces();
+    }, [enabled, fetchTraces]);
 
     return {
         traces,

@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 from typing import Optional
+from contextlib import asynccontextmanager
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ from config import get_settings  # noqa: E402
 from dependencies import get_connection_manager, get_redis  # noqa: E402
 from main import app  # noqa: E402
 from models.trace import Trace  # noqa: E402
+from security import create_access_token  # noqa: E402
 
 
 class FakeRedisService:
@@ -111,7 +113,9 @@ class FakeConnectionManager:
 
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
-    return {"X-API-Key": get_settings().api_key}
+    settings = get_settings()
+    token = create_access_token(settings, subject="test-operator", role="operator")
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
@@ -119,6 +123,12 @@ def client_and_store():
     fake_redis = FakeRedisService()
     fake_manager = FakeConnectionManager()
 
+    @asynccontextmanager
+    async def _no_op_lifespan(_app):
+        yield
+
+    original_lifespan = app.router.lifespan_context
+    app.router.lifespan_context = _no_op_lifespan
     app.dependency_overrides[get_redis] = lambda: fake_redis
     app.dependency_overrides[get_connection_manager] = lambda: fake_manager
 
@@ -126,3 +136,4 @@ def client_and_store():
         yield client, fake_redis, fake_manager
 
     app.dependency_overrides.clear()
+    app.router.lifespan_context = original_lifespan

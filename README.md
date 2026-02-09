@@ -91,14 +91,16 @@ docker run -d -p 6379:6379 redis:7-alpine
 # 2. Start Backend
 cd backend
 pip install -r requirements.txt
-export LIGHTHOUSE_API_KEY=local-dev-key
+export MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
+export JWT_SECRET=dev-secret
 export ALLOWED_ORIGINS=http://localhost:5173
 python3 -m uvicorn main:app --reload --port 8000
 
 # 3. Start Frontend (new terminal)
 cd frontend
 npm install
-export VITE_API_KEY=local-dev-key
+export VITE_AUTH_USERNAME=viewer
+export VITE_AUTH_PASSWORD=viewer
 npm run dev
 ```
 
@@ -110,7 +112,8 @@ npm run dev
 | **API Docs** | http://localhost:8000/docs |
 | **WebSocket** | ws://localhost:8000/ws |
 
-All API routes/WebSocket endpoints require `X-API-Key` by default.
+UI requests use `Authorization: Bearer <token>` after `/api/auth/login`.
+Machine-to-machine SDK ingestion uses scoped `X-API-Key`.
 
 ### Verification Flow (Recommended)
 
@@ -118,10 +121,14 @@ Run these checks in order after startup:
 
 ```bash
 # 1) Backend health
-curl -H "X-API-Key: local-dev-key" http://localhost:8000/health
+curl http://localhost:8000/health/live
+curl http://localhost:8000/health/ready
 
-# 2) Trace list API
-curl -H "X-API-Key: local-dev-key" http://localhost:8000/api/traces
+# 2) User auth and trace list API
+TOKEN=$(curl -s http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"viewer","password":"viewer"}' | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/traces
 
 # 3) Deterministic smoke trace ingestion
 cd sdk
@@ -138,9 +145,9 @@ Expected results:
 
 Use this checklist:
 
-1. Confirm frontend and backend API keys match:
-   - frontend: `VITE_API_KEY`
-   - backend: `LIGHTHOUSE_API_KEY`
+1. Confirm frontend auth and backend auth settings:
+   - frontend signs in via `/api/auth/login`
+   - backend has valid `JWT_SECRET`, `AUTH_USERS`, `ALLOWED_ORIGINS`
 2. Confirm frontend backend URL:
    - `VITE_API_URL` should point to `http://localhost:8000`
 3. Confirm backend CORS origin:
@@ -148,16 +155,17 @@ Use this checklist:
 4. Run the smoke script and verify it passes:
    - `python3 sdk/examples/smoke_trace_check.py`
 5. Check sidebar error panel text:
-   - `401/403` means API key mismatch
+   - `401/403` means auth/session/token issue
    - `Backend unreachable` means URL/backend availability issue
 
 ## 🔐 Production Security Checklist
 
-- Set a strong `LIGHTHOUSE_API_KEY`
+- Set a strong `JWT_SECRET`
+- Use explicit `MACHINE_API_KEYS` scopes for SDK ingestion only
 - Configure `ALLOWED_ORIGINS` to exact trusted origins
 - Keep Redis private (no public host port mapping)
 - Run behind HTTPS/WSS
-- Rotate API keys and monitor logs
+- Rotate machine keys and monitor auth logs
 
 ## 🔁 CI/CD
 

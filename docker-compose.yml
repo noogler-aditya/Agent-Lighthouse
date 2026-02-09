@@ -25,7 +25,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - ALLOWED_ORIGINS=http://localhost:5173
-      - LIGHTHOUSE_API_KEY=local-dev-key
+      - JWT_SECRET=dev-secret
+      - MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
+      - AUTH_USERS=admin:admin:admin,operator:operator:operator,viewer:viewer:viewer
       - REQUIRE_AUTH=true
     depends_on:
       redis:
@@ -51,7 +53,8 @@ services:
     environment:
       - VITE_API_URL=http://localhost:8000
       - VITE_WS_URL=ws://localhost:8000/ws
-      - VITE_API_KEY=local-dev-key
+      - VITE_AUTH_USERNAME=viewer
+      - VITE_AUTH_PASSWORD=viewer
     command: npm run dev -- --host --port 5173
 
 volumes:

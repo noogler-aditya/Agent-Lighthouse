@@ -7,14 +7,14 @@ from pydantic import BaseModel, Field
 
 from dependencies import get_redis
 from models.agent import Agent, AgentStatus
-from security import require_api_key
+from rate_limit import enforce_read_rate_limit, enforce_write_rate_limit
+from security import require_role
 from services.redis_service import RedisService
 
 
 router = APIRouter(
     prefix="/api/agents",
     tags=["agents"],
-    dependencies=[Depends(require_api_key)],
 )
 
 
@@ -40,7 +40,9 @@ class AgentListResponse(BaseModel):
 
 @router.get("", response_model=AgentListResponse)
 async def list_agents(
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("viewer")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """List all registered agents"""
     agents = await redis.list_agents()
@@ -50,7 +52,9 @@ async def list_agents(
 @router.post("", response_model=Agent)
 async def register_agent(
     request: RegisterAgentRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Register a new agent"""
     agent = Agent(
@@ -70,7 +74,9 @@ async def register_agent(
 @router.get("/{agent_id}", response_model=Agent)
 async def get_agent(
     agent_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("viewer")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """Get an agent by ID"""
     agent = await redis.get_agent(agent_id)
@@ -82,7 +88,9 @@ async def get_agent(
 @router.get("/{agent_id}/metrics")
 async def get_agent_metrics(
     agent_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("viewer")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """Get metrics for a specific agent across all traces"""
     agent = await redis.get_agent(agent_id)
@@ -106,7 +114,9 @@ async def get_agent_metrics(
 async def update_agent_status(
     agent_id: str,
     status: AgentStatus,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Update agent status"""
     agent = await redis.get_agent(agent_id)

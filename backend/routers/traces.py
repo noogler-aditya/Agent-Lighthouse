@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 
 from models.trace import Trace, Span, SpanKind, SpanStatus
 from dependencies import get_redis, get_connection_manager
-from security import require_api_key
+from rate_limit import enforce_read_rate_limit, enforce_write_rate_limit
+from security import require_role, require_user_or_machine
 from services.connection_manager import ConnectionManager
 from services.redis_service import RedisService
 
@@ -15,7 +16,6 @@ from services.redis_service import RedisService
 router = APIRouter(
     prefix="/api/traces",
     tags=["traces"],
-    dependencies=[Depends(require_api_key)],
 )
 
 
@@ -63,7 +63,9 @@ async def list_traces(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=100),
     status: Optional[str] = None,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_user_or_machine("viewer", "trace:read")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """List all traces with pagination"""
     traces = await redis.list_traces(offset=offset, limit=limit, status=status)
@@ -79,7 +81,9 @@ async def list_traces(
 @router.post("", response_model=Trace)
 async def create_trace(
     request: CreateTraceRequest,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_user_or_machine("operator", "trace:write")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Create a new trace"""
     trace = Trace(
@@ -95,7 +99,9 @@ async def create_trace(
 @router.get("/{trace_id}", response_model=Trace)
 async def get_trace(
     trace_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_user_or_machine("viewer", "trace:read")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """Get a trace by ID"""
     trace = await redis.get_trace(trace_id)
@@ -107,7 +113,9 @@ async def get_trace(
 @router.delete("/{trace_id}")
 async def delete_trace(
     trace_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_role("operator")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Delete a trace"""
     await redis.delete_trace(trace_id)
@@ -118,7 +126,9 @@ async def delete_trace(
 async def complete_trace(
     trace_id: str,
     status: SpanStatus = SpanStatus.SUCCESS,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_user_or_machine("operator", "trace:write")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Mark a trace as complete"""
     trace = await redis.get_trace(trace_id)
@@ -133,7 +143,9 @@ async def complete_trace(
 @router.get("/{trace_id}/tree")
 async def get_trace_tree(
     trace_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_user_or_machine("viewer", "trace:read")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """Get trace as a hierarchical tree structure for visualization"""
     trace = await redis.get_trace(trace_id)
@@ -155,6 +167,8 @@ async def create_span(
     request: CreateSpanRequest,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
+    _auth=Depends(require_user_or_machine("operator", "trace:write")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Add a span to a trace"""
     trace = await redis.get_trace(trace_id)
@@ -194,6 +208,8 @@ async def update_span(
     request: UpdateSpanRequest,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
+    _auth=Depends(require_user_or_machine("operator", "trace:write")),
+    _rate=Depends(enforce_write_rate_limit),
 ):
     """Update a span"""
     trace = await redis.get_trace(trace_id)
@@ -247,7 +263,9 @@ async def update_span(
 @router.get("/{trace_id}/metrics")
 async def get_trace_metrics(
     trace_id: str,
-    redis: RedisService = Depends(get_redis)
+    redis: RedisService = Depends(get_redis),
+    _auth=Depends(require_user_or_machine("viewer", "trace:read")),
+    _rate=Depends(enforce_read_rate_limit),
 ):
     """Get metrics summary for a trace"""
     metrics = await redis.get_metrics_summary(trace_id)
