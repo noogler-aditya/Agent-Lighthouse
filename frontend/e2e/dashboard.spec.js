@@ -56,7 +56,21 @@ test('dashboard loads traces, supports ws updates, and refreshes session', async
   });
   expect(createSpan.ok()).toBeTruthy();
 
-  await expect(toolCard).toHaveText('1');
+  await expect.poll(async () => {
+    const traceResponse = await request.get(`http://127.0.0.1:8000/api/traces/${trace.trace_id}`, {
+      headers: { Authorization: `Bearer ${operator.access_token}` },
+    });
+    if (!traceResponse.ok()) return -1;
+    const payload = await traceResponse.json();
+    return payload.tool_calls || 0;
+  }).toBe(1);
+
+  await page.reload();
+  await expect(page.getByText(trace.name)).toBeVisible();
+  await page.getByText(trace.name).click();
+
+  const refreshedToolCard = page.locator('.metric-card', { hasText: 'Tool Calls' }).locator('.metric-value');
+  await expect(refreshedToolCard).toHaveText('1');
 
   await page.getByRole('button', { name: /state/i }).click();
   await expect(page.getByText(/No state available|State is captured/i)).toBeVisible();

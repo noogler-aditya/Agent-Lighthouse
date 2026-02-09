@@ -93,6 +93,11 @@ class Settings(BaseSettings):
             scoped[self.legacy_api_key.strip()] = {"trace:write", "trace:read"}
         return scoped
 
+    @property
+    def jwt_secret_uses_default(self) -> bool:
+        default_value = self.__class__.model_fields["jwt_secret"].default
+        return self.jwt_secret == default_value
+
 
 @lru_cache
 def get_settings() -> Settings:

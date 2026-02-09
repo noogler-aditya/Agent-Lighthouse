@@ -27,7 +27,7 @@ settings = get_settings()
 
 
 def _validate_security_defaults():
-    if settings.require_auth and settings.jwt_secret == "change-me-jwt-secret":
+    if settings.require_auth and settings.jwt_secret_uses_default:
         if settings.is_production:
             raise RuntimeError("JWT_SECRET must be configured in production")
         logger.warning("Using default JWT_SECRET; set a strong value before production")

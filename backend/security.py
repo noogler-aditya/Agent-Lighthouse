@@ -257,7 +257,7 @@ async def authenticate_websocket(
 
 
 def auth_health(settings: Settings) -> dict:
-    unsafe_defaults = settings.jwt_secret == "change-me-jwt-secret"
+    unsafe_defaults = settings.jwt_secret_uses_default
     weak_machine = any(key.startswith("local-dev-key") for key in settings.machine_api_keys_map)
     return {
         "require_auth": settings.require_auth,
