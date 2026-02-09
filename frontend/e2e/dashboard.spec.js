@@ -10,9 +10,16 @@ async function loginViaApi(request, username, password) {
 
 async function loginViaUi(page, username, password) {
   await page.goto('/');
-  await page.getByLabel('Username').fill(username);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  // Click 'Sign In' on the Landing Page navigation
+  await page.getByRole('button', { name: 'Sign In' }).first().click();
+
+  // Fill form inside AuthModal
+  await page.getByPlaceholder('Enter your username').fill(username);
+  await page.getByPlaceholder('••••••••').fill(password);
+
+  // Click 'Sign In' inside the modal (submit button)
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+
   await expect(page.getByText('Select a trace to begin')).toBeVisible();
 }
 

@@ -1,85 +1,84 @@
-import { useState } from 'react';
-import { Radar, Coins, SearchCode, Bot } from './icons/AppIcons';
+import { Bot, Radar, Coins, SearchCode } from './icons/AppIcons';
 
 export function LandingPage({ onLoginClick }) {
-    return (
-        <div className="landing-page">
-            <nav className="landing-nav">
-                <div className="brand">
-                    <div className="brand-logo">
-                        <Bot className="ui-icon" />
-                    </div>
-                    <span className="brand-name">Agent Lighthouse</span>
-                </div>
-                <div className="nav-actions">
-                    <a href="https://github.com/noogler-aditya/Agent-Lighthouse" target="_blank" rel="noreferrer" className="nav-link">GitHub</a>
-                    <a href="https://github.com/noogler-aditya/Agent-Lighthouse/blob/main/docs/GETTING_STARTED.md" target="_blank" rel="noreferrer" className="nav-link">Docs</a>
-                    <button className="btn btn-secondary btn-sm" onClick={onLoginClick}>Sign In</button>
-                </div>
-            </nav>
+  return (
+    <div className="landing-page">
+      <nav className="landing-nav">
+        <div className="brand">
+          <div className="brand-logo">
+            <Bot className="ui-icon" />
+          </div>
+          <span className="brand-name">Agent Lighthouse</span>
+        </div>
+        <div className="nav-actions">
+          <a href="https://github.com/noogler-aditya/Agent-Lighthouse" target="_blank" rel="noreferrer" className="nav-link">GitHub</a>
+          <a href="https://github.com/noogler-aditya/Agent-Lighthouse/blob/main/docs/GETTING_STARTED.md" target="_blank" rel="noreferrer" className="nav-link">Docs</a>
+          <button className="btn btn-secondary btn-sm" onClick={onLoginClick}>Sign In</button>
+        </div>
+      </nav>
 
-            <main className="landing-hero">
-                <div className="hero-content">
-                    <div className="badge-pill">
-                        <span className="badge-dot"></span>
-                        v0.2.0 Now Available
-                    </div>
+      <main className="landing-hero">
+        <div className="hero-content">
+          <div className="badge-pill">
+            <span className="badge-dot"></span>
+            v0.2.0 Now Available
+          </div>
 
-                    <h1 className="hero-title">
-                        See Inside Your <br />
-                        <span className="text-gradient">AI Agents</span>
-                    </h1>
+          <h1 className="hero-title">
+            See Inside Your <br />
+            <span className="text-gradient">AI Agents</span>
+          </h1>
 
-                    <p className="hero-subtitle">
-                        The open-source visual debugger for multi-agent systems.
-                        Trace execution, monitor costs, and inspect state in real-time.
-                    </p>
+          <p className="hero-subtitle">
+            The open-source visual debugger for multi-agent systems.
+            Trace execution, monitor costs, and inspect state in real-time.
+          </p>
 
-                    <div className="hero-actions">
-                        <button className="btn btn-primary btn-lg" onClick={onLoginClick}>
-                            Start Debugging
-                        </button>
-                        <div className="hero-stats">
-                            <span>Trusted by 500+ developers</span>
-                        </div>
-                    </div>
-                </div>
+          <div className="hero-actions">
+            <button className="btn btn-primary btn-lg" onClick={onLoginClick}>
+              Start Debugging
+            </button>
+            <div className="hero-stats">
+              <span>Trusted by 500+ developers</span>
+            </div>
+          </div>
+        </div>
 
-                <div className="bento-grid">
-                    <div className="bento-card card-visual">
-                        <div className="card-icon-wrapper primary">
-                            <Radar className="ui-icon-lg" />
-                        </div>
-                        <h3>Visual Tracing</h3>
-                        <p>Watch your agents think in real-time. Debug complex loops and handoffs with an interactive graph.</p>
-                        <div className="visual-preview"></div>
-                    </div>
+        <div className="bento-grid">
+          <div className="bento-card card-visual">
+            <div className="card-icon-wrapper primary">
+              <Radar className="ui-icon-lg" />
+            </div>
+            <h3>Visual Tracing</h3>
+            <p>Watch your agents think in real-time. Debug complex loops and handoffs with an interactive graph.</p>
+            <div className="visual-preview"></div>
+          </div>
 
-                    <div className="bento-col">
-                        <div className="bento-card card-tokens">
-                            <div className="card-icon-wrapper warning">
-                                <Coins className="ui-icon-lg" />
-                            </div>
-                            <h3>Token Monitor</h3>
-                            <p>Track burn rate per agent. Optimize costs before deployment.</p>
-                        </div>
+          <div className="bento-col">
+            <div className="bento-card card-tokens">
+              <div className="card-icon-wrapper warning">
+                <Coins className="ui-icon-lg" />
+              </div>
+              <h3>Token Monitor</h3>
+              <p>Track burn rate per agent. Optimize costs before deployment.</p>
+            </div>
 
-                        <div className="bento-card card-state">
-                            <div className="card-icon-wrapper info">
-                                <SearchCode className="ui-icon-lg" />
-                            </div>
-                            <h3>State Inspector</h3>
-                            <p>Pause execution. Edit memory. Resume. Time-travel debugging for AI.</p>
-                        </div>
-                    </div>
-                </div>
-            </main>
+            <div className="bento-card card-state">
+              <div className="card-icon-wrapper info">
+                <SearchCode className="ui-icon-lg" />
+              </div>
+              <h3>State Inspector</h3>
+              <p>Pause execution. Edit memory. Resume. Time-travel debugging for AI.</p>
+            </div>
+          </div>
+        </div>
+      </main>
 
-            <footer className="landing-footer">
-                <p>© 2026 Agent Lighthouse. Open Source under MIT License.</p>
-            </footer>
+      <footer className="landing-footer">
+        <p>© 2026 Agent Lighthouse. Open Source under MIT License.</p>
+      </footer>
 
-            <style>{`
+      <style>{`
         .landing-page {
           min-height: 100vh;
           background: var(--bg-root);
@@ -297,6 +296,6 @@ export function LandingPage({ onLoginClick }) {
           .landing-nav { padding: 16px 24px; }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }
