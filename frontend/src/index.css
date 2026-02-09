@@ -1,37 +1,41 @@
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* Command Center palette */
-  --bg-root: #05070f;
-  --bg-primary: #0a0f1c;
-  --bg-secondary: #11182a;
-  --bg-tertiary: #17213a;
-  --bg-elevated: #1e2b49;
-  --bg-overlay: rgba(4, 8, 18, 0.72);
+  /* Lighthouse Dawn Palette */
+  /* Backgrounds */
+  --bg-root: #FDFCF8;       /* Warm Cream */
+  --bg-primary: #FFFFFF;    /* Pure White */
+  --bg-secondary: #F8FAF9;  /* Very Pale Mint/Grey */
+  --bg-tertiary: #F0FDF4;   /* Soft Mint (Sidebar) */
+  --bg-elevated: #FFFFFF;
+  --bg-overlay: rgba(255, 255, 255, 0.85);
 
-  --accent-primary: #5b7cff;
-  --accent-secondary: #40c4ff;
-  --accent-success: #22c55e;
-  --accent-warning: #f59e0b;
-  --accent-error: #ef4444;
-  --accent-info: #38bdf8;
+  /* Accents */
+  --accent-primary: #F97316;   /* Sunrise Orange */
+  --accent-secondary: #2DD4BF; /* Teal/Mint */
+  --accent-success: #10B981;   /* Emerald */
+  --accent-warning: #F59E0B;   /* Amber */
+  --accent-error: #EF4444;     /* Red */
+  --accent-info: #3B82F6;      /* Blue */
 
-  --text-primary: #eef4ff;
-  --text-secondary: #c2d1ec;
-  --text-muted: #8094bb;
+  /* Text - High Contrast for Readability */
+  --text-primary: #334155;   /* Slate 700 */
+  --text-secondary: #64748B; /* Slate 500 */
+  --text-muted: #94A3B8;     /* Slate 400 */
 
-  --border-primary: #253456;
-  --border-secondary: #314976;
+  /* Borders */
+  --border-primary: #E2E8F0;   /* Slate 200 */
+  --border-secondary: #CBD5E1; /* Slate 300 */
 
-  --gradient-primary: linear-gradient(140deg, #5b7cff 0%, #7d67ff 52%, #39c4ff 100%);
-  --gradient-shell: radial-gradient(140% 90% at 50% -20%, rgba(91, 124, 255, 0.22) 0%, rgba(91, 124, 255, 0) 68%),
-    linear-gradient(180deg, #0b1224 0%, #090f1d 100%);
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #F97316 0%, #FB923C 100%);
+  --gradient-shell: radial-gradient(circle at 50% 0%, rgba(253, 224, 71, 0.15) 0%, rgba(45, 212, 191, 0.05) 60%, transparent 100%);
 
-  /* Elevation */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 10px 22px rgba(0, 0, 0, 0.28);
-  --shadow-lg: 0 18px 34px rgba(0, 0, 0, 0.34);
-  --shadow-glow: 0 0 0 1px rgba(91, 124, 255, 0.24), 0 18px 34px rgba(34, 53, 104, 0.28);
+  /* Elevation - Soft colored shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+  --shadow-glow: 0 0 15px rgba(249, 115, 22, 0.3);
 
   /* Spacing */
   --space-xs: 4px;
@@ -41,25 +45,25 @@
   --space-xl: 32px;
 
   /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
 
   /* Motion */
-  --motion-fast: 120ms;
-  --motion-medium: 180ms;
-  --motion-slow: 240ms;
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-emphasized: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --motion-fast: 150ms;
+  --motion-medium: 250ms;
+  --motion-slow: 350ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   --transition-fast: var(--motion-fast) var(--ease-standard);
   --transition-normal: var(--motion-medium) var(--ease-standard);
   --transition-slow: var(--motion-slow) var(--ease-emphasized);
 
-  --focus-ring: rgba(91, 124, 255, 0.35);
+  --focus-ring: rgba(249, 115, 22, 0.4);
 
-  font-family: 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   font-weight: 400;

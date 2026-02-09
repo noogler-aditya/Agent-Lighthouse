@@ -4,6 +4,8 @@ import { AUTH_BOOTSTRAP_PASSWORD, AUTH_BOOTSTRAP_USERNAME } from './config';
 import { bootstrapSession, clearSession, getAuthContext, loginWithPassword } from './auth/session';
 import { useWebSocket, useTraces, useAgentState } from './hooks';
 import { Sidebar } from './components/Sidebar';
+import { LandingPage } from './components/LandingPage';
+import { AuthModal } from './components/AuthModal';
 import './App.css';
 
 const TraceGraph = lazy(() => import('./components/TraceGraph/TraceGraph'));
@@ -15,9 +17,9 @@ function App() {
   const [selectedSpan, setSelectedSpan] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [authContext, setAuthContext] = useState(getAuthContext());
-  const [loginError, setLoginError] = useState('');
-  const [username, setUsername] = useState(AUTH_BOOTSTRAP_USERNAME || 'viewer');
-  const [password, setPassword] = useState(AUTH_BOOTSTRAP_PASSWORD || 'viewer');
+
+  // Modal State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // WebSocket connection
   const { isConnected, onMessage, subscribeToTrace, unsubscribeFromTrace } = useWebSocket(authContext.isAuthenticated);
@@ -68,16 +70,11 @@ function App() {
     };
   }, []);
 
-  const handleLogin = useCallback(async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    try {
-      const ctx = await loginWithPassword(username, password);
-      setAuthContext(ctx);
-    } catch (err) {
-      setLoginError(err.message || 'Login failed');
-    }
-  }, [password, username]);
+  const handleLogin = useCallback(async (username, password) => {
+    const ctx = await loginWithPassword(username, password);
+    setAuthContext(ctx);
+    setIsAuthModalOpen(false);
+  }, []);
 
   const handleLogout = useCallback(() => {
     clearSession();
@@ -135,32 +132,21 @@ function App() {
     return <div className="auth-loading">Loading session...</div>;
   }
 
+  // Not Authenticated -> Show Landing Page
   if (!authContext.isAuthenticated) {
     return (
-      <div className="auth-gate">
-        <form className="auth-card" onSubmit={handleLogin}>
-          <h1>Agent Lighthouse</h1>
-          <p>Sign in to access traces</p>
-          <label>
-            Username
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
-          </label>
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-          {loginError ? <div className="auth-error">{loginError}</div> : null}
-          <button className="btn btn-primary" type="submit">Sign in</button>
-        </form>
-      </div>
+      <>
+        <LandingPage onLoginClick={() => setIsAuthModalOpen(true)} />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onLogin={handleLogin}
+        />
+      </>
     );
   }
 
+  // Authenticated -> Show Dashboard
   return (
     <div className="app-container">
       {/* Sidebar */}
