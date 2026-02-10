@@ -24,7 +24,7 @@ async function loginViaUi(page, username, password) {
 }
 
 test('dashboard loads traces, supports ws updates, and refreshes session', async ({ page, request }) => {
-  const username = `e2e_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const username = `e2e_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
   const password = 'e2e-password';
   const userSession = await registerViaApi(request, username, password);
   const createTrace = await request.post('http://127.0.0.1:8000/api/traces', {
