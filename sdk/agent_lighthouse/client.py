@@ -211,8 +211,8 @@ class LighthouseClient:
         if self._client and not self._client.is_closed:
             try:
                 self._client.close()
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Error closing HTTP client: %s", exc)
             self._client = None
 
     def __del__(self) -> None:

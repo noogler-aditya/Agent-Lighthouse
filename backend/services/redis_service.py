@@ -169,7 +169,8 @@ class RedisService:
                     trace = Trace.model_validate_json(data)
                     if trace.status.value == status:
                         count += 1
-                except Exception:
+                except Exception as parse_exc:
+                    logger.debug("Skipping unparseable trace during count: %s", parse_exc)
                     continue
         return count
 

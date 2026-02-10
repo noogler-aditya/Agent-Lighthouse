@@ -132,8 +132,8 @@ async def _resolve_api_key(api_key: str, settings: Settings) -> Principal:
                     scopes={"trace:write", "trace:read"},
                     user_id=user["id"],
                 )
-        except Exception:
-            pass  # Database not available, fall through to machine keys
+        except Exception as db_exc:
+            logger.debug("User API key lookup failed, falling through to machine keys: %s", db_exc)
 
     # 2. Check machine API keys (env var — backward compatible)
     for known_key, scopes in settings.machine_api_keys_map.items():
@@ -249,7 +249,7 @@ async def authenticate_websocket(
 
 def auth_health(settings: Settings) -> dict:
     unsafe_defaults = settings.jwt_secret_uses_default
-    weak_machine = any(key.startswith("local-dev-key") for key in settings.machine_api_keys_map)
+    weak_machine = any(key.startswith("dev-") for key in settings.machine_api_keys_map)
     return {
         "require_auth": settings.require_auth,
         "jwt_algorithm": settings.jwt_algorithm,

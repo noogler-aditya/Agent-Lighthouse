@@ -42,8 +42,8 @@ async def _heartbeat_loop(websocket: WebSocket):
                 logger.info("Heartbeat failed — closing stale WebSocket connection")
                 try:
                     await websocket.close(code=status.WS_1000_NORMAL_CLOSURE)
-                except Exception:
-                    pass
+                except Exception as close_exc:
+                    logger.debug("Error closing stale WebSocket: %s", close_exc)
                 return
     except asyncio.CancelledError:
         return

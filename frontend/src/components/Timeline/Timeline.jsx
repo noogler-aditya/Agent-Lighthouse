@@ -22,14 +22,10 @@ function formatDuration(ms) {
     return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function formatTime(dateStr) {
-    if (!dateStr) return '-';
-    const d = new Date(dateStr);
-    return d.toLocaleTimeString(undefined, { hour12: false, fractionalSecondDigits: 3 });
-}
+
 
 export default function Timeline({ trace, onSpanClick }) {
-    const { rows, totalDuration, traceStart } = useMemo(() => {
+    const { rows, totalDuration } = useMemo(() => {
         if (!trace?.spans?.length) {
             return { rows: [], totalDuration: 0, traceStart: 0 };
         }

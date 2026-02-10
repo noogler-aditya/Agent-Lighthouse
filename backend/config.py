@@ -2,12 +2,18 @@
 Application settings for Agent Lighthouse backend.
 """
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_FILE = Path(__file__).resolve().with_name(".env")
+
+# Dev-only fallback prefix (never hardcode the full secret)
+_DEV_SECRET_PREFIX = "dev-only-unsafe-"  # nosec B105
+_DEV_SECRET = _DEV_SECRET_PREFIX + os.urandom(8).hex()
+_DEV_API_KEY = "dev-" + os.urandom(4).hex()
 
 
 class Settings(BaseSettings):
@@ -38,7 +44,7 @@ class Settings(BaseSettings):
 
     # Auth settings
     require_auth: bool = Field(default=True, alias="REQUIRE_AUTH")
-    jwt_secret: str = Field(default="change-me-jwt-secret", alias="JWT_SECRET")
+    jwt_secret: str = Field(default=_DEV_SECRET, alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_issuer: str = Field(default="agent-lighthouse", alias="JWT_ISSUER")
     jwt_audience: str = Field(default="agent-lighthouse-ui", alias="JWT_AUDIENCE")
@@ -47,7 +53,7 @@ class Settings(BaseSettings):
 
     # Machine API keys for backward-compatible SDK access (optional)
     machine_api_keys: str = Field(default="", alias="MACHINE_API_KEYS")
-    legacy_api_key: str = Field(default="local-dev-key", alias="LIGHTHOUSE_API_KEY")
+    legacy_api_key: str = Field(default=_DEV_API_KEY, alias="LIGHTHOUSE_API_KEY")
 
     trace_ttl_hours: int = Field(default=24, alias="TRACE_TTL_HOURS")
 
@@ -85,8 +91,7 @@ class Settings(BaseSettings):
 
     @property
     def jwt_secret_uses_default(self) -> bool:
-        default_value = self.__class__.model_fields["jwt_secret"].default
-        return self.jwt_secret == default_value
+        return self.jwt_secret.startswith(_DEV_SECRET_PREFIX)
 
 
 @lru_cache
