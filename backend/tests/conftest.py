@@ -114,7 +114,7 @@ class FakeConnectionManager:
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
     settings = get_settings()
-    token = create_access_token(settings, subject="test-operator", role="operator")
+    token = create_access_token(settings, subject="test-user")
     return {"Authorization": f"Bearer {token}"}
 
 

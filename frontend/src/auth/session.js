@@ -2,13 +2,13 @@ import { API_BASE_URL } from '../config';
 
 const REFRESH_TOKEN_KEY = 'lighthouse_refresh_token';
 const ACCESS_TOKEN_KEY = 'lighthouse_access_token';
-const USER_ROLE_KEY = 'lighthouse_user_role';
 const USER_SUBJECT_KEY = 'lighthouse_user_subject';
 
 let accessToken = localStorage.getItem(ACCESS_TOKEN_KEY) || '';
 let subject = localStorage.getItem(USER_SUBJECT_KEY) || '';
-let role = localStorage.getItem(USER_ROLE_KEY) || '';
 let refreshPromise = null;
+
+localStorage.removeItem('lighthouse_user_role');
 
 function parseJwt(token) {
   try {
@@ -33,15 +33,11 @@ function persistAccessToken(token) {
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
     const payload = parseJwt(accessToken) || {};
     subject = payload.sub || '';
-    role = payload.role || '';
     if (subject) localStorage.setItem(USER_SUBJECT_KEY, subject);
-    if (role) localStorage.setItem(USER_ROLE_KEY, role);
   } else {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(USER_SUBJECT_KEY);
-    localStorage.removeItem(USER_ROLE_KEY);
     subject = '';
-    role = '';
   }
 }
 
@@ -57,7 +53,6 @@ export function getAccessToken() {
 export function getAuthContext() {
   return {
     subject,
-    role,
     isAuthenticated: Boolean(accessToken),
   };
 }
@@ -78,6 +73,24 @@ export async function loginWithPassword(username, password) {
   persistAccessToken(data.access_token);
   setRefreshToken(data.refresh_token);
   return getAuthContext();
+}
+
+export async function registerWithPassword(username, password) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || 'Registration failed');
+  }
+
+  const data = await response.json();
+  persistAccessToken(data.access_token);
+  setRefreshToken(data.refresh_token);
+  return { ...getAuthContext(), apiKey: data.api_key };
 }
 
 export function clearSession() {

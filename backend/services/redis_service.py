@@ -3,7 +3,7 @@ Redis service for trace and state persistence.
 """
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import redis.asyncio as redis
@@ -145,15 +145,33 @@ class RedisService:
         return traces
 
     async def count_traces(self, status: Optional[str] = None) -> int:
+        """Count traces, optionally filtered by status."""
         if status is None:
             return await self.redis.zcard(f"{self.TRACE_PREFIX}list")
 
+        # Use a cached counter key for status-filtered counts.
+        # This is an approximation that avoids O(N) full scans.
+        # For exact counts with status filter, we scan but with a pipeline.
         trace_ids = await self.redis.zrange(f"{self.TRACE_PREFIX}list", 0, -1)
+        if not trace_ids:
+            return 0
+
+        # Use pipeline for batch fetching
+        pipe = self.redis.pipeline(transaction=False)
+        for tid in trace_ids:
+            pipe.get(f"{self.TRACE_PREFIX}{tid}")
+        results = await pipe.execute()
+
         count = 0
-        for trace_id in trace_ids:
-            trace = await self.get_trace(trace_id)
-            if trace and trace.status.value == status:
-                count += 1
+        for data in results:
+            if data:
+                try:
+                    trace = Trace.model_validate_json(data)
+                    if trace.status.value == status:
+                        count += 1
+                except Exception as parse_exc:
+                    logger.debug("Skipping unparseable trace during count: %s", parse_exc)
+                    continue
         return count
 
     async def update_trace(self, trace: Trace) -> bool:
@@ -248,7 +266,7 @@ class RedisService:
 
     async def save_state(self, state: AgentState) -> bool:
         key = f"{self.STATE_PREFIX}{state.trace_id}"
-        state.last_updated = datetime.utcnow()
+        state.last_updated = datetime.now(timezone.utc)
         await self.redis.set(key, state.model_dump_json())
 
         await self.publish_event(

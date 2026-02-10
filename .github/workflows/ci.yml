@@ -145,6 +145,19 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: lighthouse
+          POSTGRES_PASSWORD: lighthouse
+          POSTGRES_DB: lighthouse
+        options: >-
+          --health-cmd "pg_isready -U lighthouse"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -167,9 +180,9 @@ jobs:
         env:
           JWT_SECRET: ci-jwt-secret
           MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
-          AUTH_USERS: "admin:admin:admin,operator:operator:operator,viewer:viewer:viewer"
           ALLOWED_ORIGINS: http://localhost:5173
           REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
         run: |
           nohup uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
           echo $! > backend.pid
@@ -192,9 +205,9 @@ jobs:
           code_without_auth=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/traces)
           test "$code_without_auth" = "401"
 
-          viewer_token=$(curl -s http://127.0.0.1:8000/api/auth/login \
+          viewer_token=$(curl -s http://127.0.0.1:8000/api/auth/register \
             -H "Content-Type: application/json" \
-            -d '{"username":"viewer","password":"viewer"}' | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+            -d '{"username":"ci-user","password":"ci-pass"}' | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
           code_with_bearer=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${viewer_token}" http://127.0.0.1:8000/api/traces)
           test "$code_with_bearer" = "200"
 
@@ -239,6 +252,19 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: lighthouse
+          POSTGRES_PASSWORD: lighthouse
+          POSTGRES_DB: lighthouse
+        options: >-
+          --health-cmd "pg_isready -U lighthouse"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -258,6 +284,7 @@ jobs:
       - name: Run backend integration tests
         env:
           REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
           JWT_SECRET: ci-jwt-secret
           ALLOWED_ORIGINS: http://localhost:5173
         run: pytest -q backend/integration_tests
@@ -272,6 +299,19 @@ jobs:
           - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      postgres:
+        image: postgres:16-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: lighthouse
+          POSTGRES_PASSWORD: lighthouse
+          POSTGRES_DB: lighthouse
+        options: >-
+          --health-cmd "pg_isready -U lighthouse"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
@@ -293,9 +333,9 @@ jobs:
         env:
           JWT_SECRET: ci-jwt-secret
           MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
-          AUTH_USERS: "admin:admin:admin,operator:operator:operator,viewer:viewer:viewer"
           ALLOWED_ORIGINS: http://127.0.0.1:4173,http://localhost:4173
           REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
         run: |
           nohup uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000 > backend-e2e.log 2>&1 &
           echo $! > backend-e2e.pid

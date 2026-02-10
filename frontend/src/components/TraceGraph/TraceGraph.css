@@ -183,8 +183,8 @@
     width: 100%;
     height: 100%;
     background:
-        radial-gradient(110% 80% at 50% -25%, rgba(91, 124, 255, 0.2) 0%, rgba(91, 124, 255, 0) 72%),
-        linear-gradient(180deg, rgba(10, 17, 31, 0.98) 0%, rgba(8, 13, 25, 0.98) 100%);
+        radial-gradient(120% 90% at 50% -20%, rgba(253, 224, 71, 0.2) 0%, rgba(45, 212, 191, 0.08) 45%, rgba(253, 252, 248, 0) 75%),
+        linear-gradient(180deg, #FDFCF8 0%, #F8FAF9 100%);
 }
 
 .trace-graph-empty {
@@ -196,7 +196,7 @@
     color: var(--text-muted);
     gap: var(--space-md);
     background:
-        radial-gradient(60% 45% at 50% 40%, rgba(91, 124, 255, 0.18) 0%, rgba(91, 124, 255, 0) 100%),
+        radial-gradient(60% 50% at 50% 40%, rgba(45, 212, 191, 0.16) 0%, rgba(45, 212, 191, 0) 70%),
         transparent;
 }
 
@@ -205,7 +205,7 @@
     height: 48px;
     opacity: 0.65;
     color: var(--accent-secondary);
-    filter: drop-shadow(0 0 10px rgba(64, 196, 255, 0.25));
+    filter: drop-shadow(0 8px 16px rgba(45, 212, 191, 0.28));
 }
 
 .trace-graph-empty .empty-text {
@@ -220,11 +220,11 @@
 }
 
 .trace-graph-container .react-flow__panel {
-    background: rgba(18, 27, 47, 0.9);
-    border: 1px solid rgba(108, 129, 174, 0.35);
+    background: var(--bg-panel);
+    border: 1px solid var(--panel-border);
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-    backdrop-filter: blur(4px);
+    box-shadow: var(--panel-shadow);
+    backdrop-filter: blur(8px);
 }
 
 .trace-graph-container .react-flow__controls {
@@ -236,6 +236,10 @@
 .trace-graph-container .react-flow__controls-button {
     border: none;
     color: var(--text-secondary);
+}
+
+.trace-graph-container .react-flow__edge-path {
+    stroke: rgba(148, 163, 184, 0.7);
 }
 
 .trace-graph-container .react-flow__controls-button:hover {

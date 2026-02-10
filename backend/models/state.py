@@ -1,12 +1,17 @@
 """
 Agent state and execution control models
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 import uuid
 import copy
+
+
+def _utcnow() -> datetime:
+    """Timezone-aware UTC now (compatible with Python 3.12+)."""
+    return datetime.now(timezone.utc)
 
 
 class ExecutionStatus(str, Enum):
@@ -40,7 +45,7 @@ class ExecutionControl(BaseModel):
     def pause(self, span_id: Optional[str] = None):
         """Pause execution"""
         self.status = ExecutionStatus.PAUSED
-        self.paused_at = datetime.utcnow()
+        self.paused_at = _utcnow()
         self.paused_span_id = span_id
         self.resume_requested = False
     
@@ -67,7 +72,7 @@ class StateSnapshot(BaseModel):
     trace_id: str
     span_id: str
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utcnow)
     
     # State data (JSON-serializable)
     state_data: dict[str, Any] = Field(default_factory=dict)
@@ -112,7 +117,7 @@ class AgentState(BaseModel):
     control: ExecutionControl = Field(default_factory=lambda: ExecutionControl(trace_id=""))
     
     # Timestamps
-    last_updated: datetime = Field(default_factory=datetime.utcnow)
+    last_updated: datetime = Field(default_factory=_utcnow)
     
     def take_snapshot(self, span_id: str, description: Optional[str] = None) -> StateSnapshot:
         """Create a snapshot of current state"""
@@ -139,7 +144,7 @@ class AgentState(BaseModel):
                 self.context = snapshot.state_data.get("context", {})
                 self.variables = snapshot.state_data.get("variables", {})
                 self.messages = snapshot.state_data.get("messages", [])
-                self.last_updated = datetime.utcnow()
+                self.last_updated = _utcnow()
                 return True
         return False
     
@@ -175,5 +180,5 @@ class AgentState(BaseModel):
         
         # Set the value
         container[key_path[-1]] = value
-        self.last_updated = datetime.utcnow()
+        self.last_updated = _utcnow()
         return True

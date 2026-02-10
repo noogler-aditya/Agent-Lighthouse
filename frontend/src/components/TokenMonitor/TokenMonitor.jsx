@@ -135,14 +135,14 @@ export default function TokenMonitor({ trace }) {
                                         <Cell
                                             key={entry.name}
                                             fill={COLORS[index % COLORS.length]}
-                                            stroke="#0f1327"
+                                            stroke="#FDFCF8"
                                             strokeWidth={2}
                                         />
                                     ))}
                                 </Pie>
                                 <Tooltip
                                     content={renderTooltip}
-                                    cursor={{ fill: 'rgba(99, 102, 241, 0.14)' }}
+                                    cursor={{ fill: 'rgba(249, 115, 22, 0.12)' }}
                                 />
                             </PieChart>
                         </ResponsiveContainer>
@@ -191,7 +191,7 @@ export default function TokenMonitor({ trace }) {
                                 <Tooltip
                                     content={renderTooltip}
                                 />
-                                <Bar dataKey="cost" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                                <Bar dataKey="cost" fill="#F97316" radius={[0, 4, 4, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

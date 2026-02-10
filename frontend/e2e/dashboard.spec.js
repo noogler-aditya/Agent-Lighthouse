@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-async function loginViaApi(request, username, password) {
-  const response = await request.post('http://127.0.0.1:8000/api/auth/login', {
+async function registerViaApi(request, username, password) {
+  const response = await request.post('http://127.0.0.1:8000/api/auth/register', {
     data: { username, password },
   });
   expect(response.ok()).toBeTruthy();
@@ -24,9 +24,11 @@ async function loginViaUi(page, username, password) {
 }
 
 test('dashboard loads traces, supports ws updates, and refreshes session', async ({ page, request }) => {
-  const operator = await loginViaApi(request, 'operator', 'operator');
+  const username = `e2e_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+  const password = 'e2e-password';
+  const userSession = await registerViaApi(request, username, password);
   const createTrace = await request.post('http://127.0.0.1:8000/api/traces', {
-    headers: { Authorization: `Bearer ${operator.access_token}` },
+    headers: { Authorization: `Bearer ${userSession.access_token}` },
     data: {
       name: `e2e-trace-${Date.now()}`,
       metadata: { source: 'playwright' },
@@ -35,7 +37,7 @@ test('dashboard loads traces, supports ws updates, and refreshes session', async
   expect(createTrace.ok()).toBeTruthy();
   const trace = await createTrace.json();
 
-  await loginViaUi(page, 'viewer', 'viewer');
+  await loginViaUi(page, username, password);
 
   // Force an expired/invalid access token and verify refresh keeps session alive.
   await page.evaluate(() => {
@@ -54,7 +56,7 @@ test('dashboard loads traces, supports ws updates, and refreshes session', async
   await expect(toolCard).toHaveText('0');
 
   const createSpan = await request.post(`http://127.0.0.1:8000/api/traces/${trace.trace_id}/spans`, {
-    headers: { Authorization: `Bearer ${operator.access_token}` },
+    headers: { Authorization: `Bearer ${userSession.access_token}` },
     data: {
       name: 'e2e-tool-span',
       kind: 'tool',
@@ -65,7 +67,7 @@ test('dashboard loads traces, supports ws updates, and refreshes session', async
 
   await expect.poll(async () => {
     const traceResponse = await request.get(`http://127.0.0.1:8000/api/traces/${trace.trace_id}`, {
-      headers: { Authorization: `Bearer ${operator.access_token}` },
+      headers: { Authorization: `Bearer ${userSession.access_token}` },
     });
     if (!traceResponse.ok()) return -1;
     const payload = await traceResponse.json();

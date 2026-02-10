@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from dependencies import get_redis
 from models.agent import Agent, AgentStatus
 from rate_limit import enforce_read_rate_limit, enforce_write_rate_limit
-from security import require_role
+from security import require_auth
 from services.redis_service import RedisService
 
 
@@ -41,7 +41,7 @@ class AgentListResponse(BaseModel):
 @router.get("", response_model=AgentListResponse)
 async def list_agents(
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("viewer")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_read_rate_limit),
 ):
     """List all registered agents"""
@@ -53,7 +53,7 @@ async def list_agents(
 async def register_agent(
     request: RegisterAgentRequest,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Register a new agent"""
@@ -75,7 +75,7 @@ async def register_agent(
 async def get_agent(
     agent_id: str,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("viewer")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_read_rate_limit),
 ):
     """Get an agent by ID"""
@@ -89,7 +89,7 @@ async def get_agent(
 async def get_agent_metrics(
     agent_id: str,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("viewer")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_read_rate_limit),
 ):
     """Get metrics for a specific agent across all traces"""
@@ -115,7 +115,7 @@ async def update_agent_status(
     agent_id: str,
     status: AgentStatus,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Update agent status"""

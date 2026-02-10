@@ -1,5 +1,8 @@
 """
 Authentication and authorization helpers for HTTP and WebSocket access.
+
+Simplified: no role hierarchy. All authenticated users have equal access.
+Machine API keys (X-API-Key) and user-generated API keys are both supported.
 """
 from __future__ import annotations
 
@@ -17,19 +20,13 @@ from config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
-ROLE_ORDER = {
-    "viewer": 10,
-    "operator": 20,
-    "admin": 30,
-}
-
 
 @dataclass
 class Principal:
     subject: str
-    role: str
-    auth_type: str
+    auth_type: str  # "user", "machine", or "api_key"
     scopes: set[str]
+    user_id: Optional[str] = None
 
 
 class AuthError(HTTPException):
@@ -44,20 +41,6 @@ def _normalize(value: Optional[str]) -> Optional[str]:
     if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
         normalized = normalized[1:-1].strip()
     return normalized or None
-
-
-def _assert_role(value: str) -> str:
-    role = value.strip().lower()
-    if role not in ROLE_ORDER:
-        raise AuthError(f"Unsupported role: {value}", status.HTTP_403_FORBIDDEN)
-    return role
-
-
-def _ensure_role(principal: Principal, minimum_role: str):
-    required = _assert_role(minimum_role)
-    principal_role = _assert_role(principal.role)
-    if ROLE_ORDER[principal_role] < ROLE_ORDER[required]:
-        raise AuthError("Insufficient role", status.HTTP_403_FORBIDDEN)
 
 
 def _parse_bearer(authorization: Optional[str]) -> str:
@@ -85,20 +68,17 @@ def _decode_token(token: str, settings: Settings, expected_type: str = "access")
     if payload.get("typ") != expected_type:
         raise AuthError("Invalid token type")
 
-    role = payload.get("role")
     sub = payload.get("sub")
-    if not role or not sub:
+    if not sub:
         raise AuthError("Token missing required claims")
 
-    payload["role"] = _assert_role(role)
     return payload
 
 
-def create_access_token(settings: Settings, subject: str, role: str) -> str:
+def create_access_token(settings: Settings, subject: str, user_id: Optional[str] = None) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": subject,
-        "role": _assert_role(role),
         "typ": "access",
         "iss": settings.jwt_issuer,
         "aud": settings.jwt_audience,
@@ -106,14 +86,15 @@ def create_access_token(settings: Settings, subject: str, role: str) -> str:
         "exp": int((now + timedelta(minutes=settings.access_token_ttl_minutes)).timestamp()),
         "jti": secrets.token_urlsafe(12),
     }
+    if user_id:
+        payload["uid"] = user_id
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def create_refresh_token(settings: Settings, subject: str, role: str) -> str:
+def create_refresh_token(settings: Settings, subject: str, user_id: Optional[str] = None) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": subject,
-        "role": _assert_role(role),
         "typ": "refresh",
         "iss": settings.jwt_issuer,
         "aud": settings.jwt_audience,
@@ -121,6 +102,8 @@ def create_refresh_token(settings: Settings, subject: str, role: str) -> str:
         "exp": int((now + timedelta(minutes=settings.refresh_token_ttl_minutes)).timestamp()),
         "jti": secrets.token_urlsafe(16),
     }
+    if user_id:
+        payload["uid"] = user_id
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -128,18 +111,36 @@ def decode_refresh_token(token: str, settings: Settings) -> dict:
     return _decode_token(token, settings, expected_type="refresh")
 
 
-def _machine_principal(api_key: str, settings: Settings, required_scope: Optional[str]) -> Principal:
+async def _resolve_api_key(api_key: str, settings: Settings) -> Principal:
+    """
+    Resolve an API key to a Principal.
+    Checks user-generated keys (PostgreSQL) first, then machine keys (env var).
+    """
     key = _normalize(api_key)
     if not key:
-        raise AuthError("Missing machine API key")
+        raise AuthError("Missing API key")
 
+    # 1. Check user-generated API keys (from PostgreSQL)
+    if key.startswith("lh_"):
+        try:
+            from services.user_service import get_user_by_api_key
+            user = await get_user_by_api_key(key)
+            if user:
+                return Principal(
+                    subject=user["username"],
+                    auth_type="api_key",
+                    scopes={"trace:write", "trace:read"},
+                    user_id=user["id"],
+                )
+        except Exception as db_exc:
+            logger.debug("User API key lookup failed, falling through to machine keys: %s", db_exc)
+
+    # 2. Check machine API keys (env var — backward compatible)
     for known_key, scopes in settings.machine_api_keys_map.items():
         if hmac.compare_digest(key, known_key):
-            if required_scope and required_scope not in scopes:
-                raise AuthError("Machine API key missing required scope", status.HTTP_403_FORBIDDEN)
-            return Principal(subject="machine", role="operator", auth_type="machine", scopes=scopes)
+            return Principal(subject="machine", auth_type="machine", scopes=scopes)
 
-    raise AuthError("Invalid machine API key")
+    raise AuthError("Invalid API key")
 
 
 def _user_principal(authorization: Optional[str], settings: Settings) -> Principal:
@@ -147,9 +148,9 @@ def _user_principal(authorization: Optional[str], settings: Settings) -> Princip
     payload = _decode_token(token, settings, expected_type="access")
     return Principal(
         subject=payload["sub"],
-        role=payload["role"],
         auth_type="user",
         scopes={"ui"},
+        user_id=payload.get("uid"),
     )
 
 
@@ -159,7 +160,7 @@ async def require_user_auth(
 ) -> Principal:
     settings = get_settings()
     if not settings.require_auth:
-        principal = Principal(subject="dev-user", role="admin", auth_type="user", scopes={"*"})
+        principal = Principal(subject="dev-user", auth_type="user", scopes={"*"})
     else:
         principal = _user_principal(authorization, settings)
 
@@ -167,26 +168,15 @@ async def require_user_auth(
     return principal
 
 
-async def require_machine_key(
-    request: Request,
-    required_scope: Optional[str] = None,
-    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
-) -> Principal:
-    settings = get_settings()
-    principal = _machine_principal(x_api_key, settings, required_scope)
-    request.state.principal = principal
-    return principal
-
-
-def require_role(minimum_role: str) -> Callable:
+def require_auth() -> Callable:
+    """Require any authenticated user (no role check)."""
     async def _dependency(principal: Principal = Depends(require_user_auth)) -> Principal:
-        _ensure_role(principal, minimum_role)
         return principal
-
     return _dependency
 
 
-def require_user_or_machine(minimum_role: str, scope: str) -> Callable:
+def require_user_or_machine(scope: str) -> Callable:
+    """Allow either a user (Bearer token) or machine (X-API-Key) with the given scope."""
     async def _dependency(
         request: Request,
         authorization: Optional[str] = Header(default=None, alias="Authorization"),
@@ -194,7 +184,7 @@ def require_user_or_machine(minimum_role: str, scope: str) -> Callable:
     ) -> Principal:
         settings = get_settings()
         if not settings.require_auth:
-            principal = Principal(subject="dev-user", role="admin", auth_type="user", scopes={"*"})
+            principal = Principal(subject="dev-user", auth_type="user", scopes={"*"})
             request.state.principal = principal
             return principal
 
@@ -203,17 +193,19 @@ def require_user_or_machine(minimum_role: str, scope: str) -> Callable:
 
         if authorization:
             try:
-                candidate = _user_principal(authorization, settings)
-                _ensure_role(candidate, minimum_role)
-                principal = candidate
-            except Exception as exc:  # noqa: BLE001
+                principal = _user_principal(authorization, settings)
+            except Exception as exc:
                 user_auth_error = exc
 
         if principal is None and x_api_key:
-            principal = _machine_principal(x_api_key, settings, scope)
+            principal = await _resolve_api_key(x_api_key, settings)
 
         if principal is None:
             raise user_auth_error if isinstance(user_auth_error, HTTPException) else AuthError("Unauthorized")
+
+        if principal.auth_type in {"machine", "api_key"}:
+            if "*" not in principal.scopes and scope not in principal.scopes:
+                raise AuthError("Forbidden", status_code=status.HTTP_403_FORBIDDEN)
 
         request.state.principal = principal
         return principal
@@ -233,22 +225,20 @@ def _parse_ws_bearer(websocket: WebSocket) -> str:
 
 async def authenticate_websocket(
     websocket: WebSocket,
-    minimum_role: str = "viewer",
     enforce_rate_limit: Optional[Callable[[str], None]] = None,
 ) -> Principal:
     settings = get_settings()
     if not settings.require_auth:
-        principal = Principal(subject="dev-user", role="admin", auth_type="user", scopes={"*"})
+        principal = Principal(subject="dev-user", auth_type="user", scopes={"*"})
     else:
         token = _parse_ws_bearer(websocket)
         payload = _decode_token(token, settings, expected_type="access")
         principal = Principal(
             subject=payload["sub"],
-            role=payload["role"],
             auth_type="user",
             scopes={"ui"},
+            user_id=payload.get("uid"),
         )
-        _ensure_role(principal, minimum_role)
 
     if enforce_rate_limit is not None:
         enforce_rate_limit(principal.subject)
@@ -259,7 +249,7 @@ async def authenticate_websocket(
 
 def auth_health(settings: Settings) -> dict:
     unsafe_defaults = settings.jwt_secret_uses_default
-    weak_machine = any(key.startswith("local-dev-key") for key in settings.machine_api_keys_map)
+    weak_machine = any(key.startswith("dev-") for key in settings.machine_api_keys_map)
     return {
         "require_auth": settings.require_auth,
         "jwt_algorithm": settings.jwt_algorithm,

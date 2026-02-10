@@ -2,12 +2,18 @@
 Application settings for Agent Lighthouse backend.
 """
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_FILE = Path(__file__).resolve().with_name(".env")
+
+# Dev-only fallback prefix (never hardcode the full secret)
+_DEV_SECRET_PREFIX = "dev-only-unsafe-"  # nosec B105
+_DEV_SECRET = _DEV_SECRET_PREFIX + os.urandom(8).hex()
+_DEV_API_KEY = "dev-" + os.urandom(4).hex()
 
 
 class Settings(BaseSettings):
@@ -20,6 +26,13 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     build_version: str = Field(default="dev", alias="BUILD_VERSION")
 
+    # PostgreSQL — user storage
+    database_url: str = Field(
+        default="postgresql://lighthouse:lighthouse@localhost:5432/lighthouse",
+        alias="DATABASE_URL",
+    )
+
+    # Redis — trace/span/state storage
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
     redis_connect_timeout_seconds: int = Field(default=5, alias="REDIS_CONNECT_TIMEOUT_SECONDS")
     redis_required_appendonly: str = Field(default="yes", alias="REDIS_REQUIRED_APPENDONLY")
@@ -29,21 +42,18 @@ class Settings(BaseSettings):
     allowed_origins: str = Field(default="http://localhost:5173", alias="ALLOWED_ORIGINS")
     cors_allow_credentials: bool = Field(default=False, alias="CORS_ALLOW_CREDENTIALS")
 
+    # Auth settings
     require_auth: bool = Field(default=True, alias="REQUIRE_AUTH")
-    jwt_secret: str = Field(default="change-me-jwt-secret", alias="JWT_SECRET")
+    jwt_secret: str = Field(default=_DEV_SECRET, alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_issuer: str = Field(default="agent-lighthouse", alias="JWT_ISSUER")
     jwt_audience: str = Field(default="agent-lighthouse-ui", alias="JWT_AUDIENCE")
     access_token_ttl_minutes: int = Field(default=15, alias="ACCESS_TOKEN_TTL_MINUTES")
     refresh_token_ttl_minutes: int = Field(default=43200, alias="REFRESH_TOKEN_TTL_MINUTES")
 
-    auth_users: str = Field(
-        default="admin:admin:admin,operator:operator:operator,viewer:viewer:viewer",
-        alias="AUTH_USERS",
-    )
-
+    # Machine API keys for backward-compatible SDK access (optional)
     machine_api_keys: str = Field(default="", alias="MACHINE_API_KEYS")
-    legacy_api_key: str = Field(default="local-dev-key", alias="LIGHTHOUSE_API_KEY")
+    legacy_api_key: str = Field(default=_DEV_API_KEY, alias="LIGHTHOUSE_API_KEY")
 
     trace_ttl_hours: int = Field(default=24, alias="TRACE_TTL_HOURS")
 
@@ -61,20 +71,6 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
-
-    @property
-    def auth_users_map(self) -> dict[str, dict[str, str]]:
-        users: dict[str, dict[str, str]] = {}
-        for raw in self.auth_users.split(","):
-            raw = raw.strip()
-            if not raw:
-                continue
-            parts = [segment.strip() for segment in raw.split(":")]
-            if len(parts) != 3:
-                continue
-            username, password, role = parts
-            users[username] = {"password": password, "role": role}
-        return users
 
     @property
     def machine_api_keys_map(self) -> dict[str, set[str]]:
@@ -95,8 +91,7 @@ class Settings(BaseSettings):
 
     @property
     def jwt_secret_uses_default(self) -> bool:
-        default_value = self.__class__.model_fields["jwt_secret"].default
-        return self.jwt_secret == default_value
+        return self.jwt_secret.startswith(_DEV_SECRET_PREFIX)
 
 
 @lru_cache

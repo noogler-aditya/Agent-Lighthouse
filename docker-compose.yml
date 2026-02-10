@@ -14,6 +14,22 @@ services:
       timeout: 3s
       retries: 5
 
+  # PostgreSQL for user auth
+  postgres:
+    image: postgres:16-alpine
+    container_name: lighthouse-postgres
+    environment:
+      POSTGRES_USER: lighthouse
+      POSTGRES_PASSWORD: lighthouse
+      POSTGRES_DB: lighthouse
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lighthouse"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # FastAPI Backend
   backend:
     build:
@@ -24,13 +40,15 @@ services:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://lighthouse:lighthouse@postgres:5432/lighthouse
       - ALLOWED_ORIGINS=http://localhost:5173
       - JWT_SECRET=dev-secret
       - MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
-      - AUTH_USERS=admin:admin:admin,operator:operator:operator,viewer:viewer:viewer
       - REQUIRE_AUTH=true
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -53,9 +71,8 @@ services:
     environment:
       - VITE_API_URL=http://localhost:8000
       - VITE_WS_URL=ws://localhost:8000/ws
-      - VITE_AUTH_USERNAME=viewer
-      - VITE_AUTH_PASSWORD=viewer
     command: npm run dev -- --host --port 5173
 
 volumes:
   redis_data:
+  pg_data:

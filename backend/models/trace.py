@@ -1,11 +1,16 @@
 """
 Trace and Span models for execution tracking
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 import uuid
+
+
+def _utcnow() -> datetime:
+    """Timezone-aware UTC now (compatible with Python 3.12+)."""
+    return datetime.now(timezone.utc)
 
 
 class SpanKind(str, Enum):
@@ -40,7 +45,7 @@ class Span(BaseModel):
     status: SpanStatus = SpanStatus.RUNNING
     
     # Timing
-    start_time: datetime = Field(default_factory=datetime.utcnow)
+    start_time: datetime = Field(default_factory=_utcnow)
     end_time: Optional[datetime] = None
     duration_ms: Optional[float] = None
     
@@ -67,7 +72,7 @@ class Span(BaseModel):
 
     def complete(self, status: SpanStatus = SpanStatus.SUCCESS, output: Optional[dict] = None):
         """Mark span as complete"""
-        self.end_time = datetime.utcnow()
+        self.end_time = _utcnow()
         self.status = status
         if output is not None:
             self.output_data = output
@@ -89,7 +94,7 @@ class Trace(BaseModel):
     status: SpanStatus = SpanStatus.RUNNING
     
     # Timing
-    start_time: datetime = Field(default_factory=datetime.utcnow)
+    start_time: datetime = Field(default_factory=_utcnow)
     end_time: Optional[datetime] = None
     duration_ms: Optional[float] = None
     
@@ -121,7 +126,7 @@ class Trace(BaseModel):
     
     def complete(self, status: SpanStatus = SpanStatus.SUCCESS):
         """Mark trace as complete"""
-        self.end_time = datetime.utcnow()
+        self.end_time = _utcnow()
         self.status = status
         if self.start_time and self.end_time:
             self.duration_ms = (self.end_time - self.start_time).total_seconds() * 1000
