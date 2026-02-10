@@ -410,14 +410,16 @@ class LighthouseTracer:
             )
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
+            error_message = str(e)[:500]
+            error_type = type(e).__name__
             await loop.run_in_executor(
                 None,
                 lambda: self.client.update_span(
                     trace_id=trace_id,
                     span_id=span_id,
                     status="error",
-                    error_message=str(e)[:500],
-                    error_type=type(e).__name__,
+                    error_message=error_message,
+                    error_type=error_type,
                     duration_ms=duration_ms,
                 ),
             )
