@@ -1,50 +1,174 @@
 """
-Tracer and decorators for instrumenting agent code
+Tracer and decorators for instrumenting multi-agent code.
+
+Enterprise-grade with:
+- Thread-safe span tracking via ContextVar
+- Async + sync decorator support
+- Automatic output capture
+- Client-side timing (perf_counter)
+- Fail-silent wrapping at every boundary
+- Safe serialization of arguments/return values
 """
+from __future__ import annotations
+
+import asyncio
 import functools
+import logging
+import time
 import uuid
-from typing import Optional, Callable, Any
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
+from typing import Any, Callable, Optional
+
 from .client import LighthouseClient
+
+logger = logging.getLogger("agent_lighthouse.tracer")
+
+# ---------------------------------------------------------------------------
+# Safe serialization helpers
+# ---------------------------------------------------------------------------
+_MAX_CAPTURE_LEN = 2000  # max chars for captured input/output
+
+
+def _safe_serialize(value: Any, max_len: int = _MAX_CAPTURE_LEN) -> Any:
+    """
+    Safely convert a value to a JSON-serializable dict/string.
+    Never raises — returns a truncated string representation on failure.
+    """
+    if value is None:
+        return None
+
+    try:
+        if isinstance(value, dict):
+            serialized = str(value)
+        elif isinstance(value, (list, tuple)):
+            serialized = str(value)
+        elif isinstance(value, (str, int, float, bool)):
+            serialized = str(value)
+        elif hasattr(value, "model_dump"):
+            # Pydantic model support
+            serialized = str(value.model_dump())
+        elif hasattr(value, "__dict__"):
+            serialized = str(value.__dict__)
+        else:
+            serialized = repr(value)
+    except Exception:  # noqa: BLE001
+        serialized = f"<unserializable: {type(value).__name__}>"
+
+    if len(serialized) > max_len:
+        return {"_truncated": True, "value": serialized[:max_len] + "..."}
+    return {"value": serialized}
+
+
+def _capture_args(args: tuple, kwargs: dict) -> dict:
+    """Capture function arguments safely."""
+    try:
+        result = {}
+        if args:
+            result["args"] = _safe_serialize(args)
+        if kwargs:
+            result["kwargs"] = _safe_serialize(kwargs)
+        return result
+    except Exception:  # noqa: BLE001
+        return {"_capture_error": "Failed to capture arguments"}
+
+
+def _capture_output(value: Any) -> Optional[dict]:
+    """Capture function return value safely."""
+    try:
+        if value is None:
+            return None
+        return {"result": _safe_serialize(value)}
+    except Exception:  # noqa: BLE001
+        return {"_capture_error": "Failed to capture output"}
+
+
+# ---------------------------------------------------------------------------
+# Context variables for thread-safe span tracking
+# ---------------------------------------------------------------------------
+_active_tracer: ContextVar[Optional[LighthouseTracer]] = ContextVar(
+    "active_lighthouse_tracer", default=None
+)
+_active_trace_id: ContextVar[Optional[str]] = ContextVar(
+    "active_trace_id", default=None
+)
+_active_span_stack: ContextVar[list[str]] = ContextVar(
+    "active_span_stack",  # each async task / thread gets its own stack
+)
 
 
 class LighthouseTracer:
     """
     Tracer for instrumenting multi-agent systems.
-    
-    Usage:
+
+    Thread-safe, async-ready, and fail-silent by default.
+    Uses ContextVar for span stack isolation across threads/tasks.
+
+    Usage::
+
         tracer = LighthouseTracer()
-        
+
         with tracer.trace("My Agent Workflow"):
             with tracer.span("Agent 1", kind="agent"):
                 # Agent logic
                 pass
+
+    Async usage::
+
+        async with tracer.atrace("My Async Workflow"):
+            async with tracer.aspan("Agent 1", kind="agent"):
+                pass
     """
-    
+
     def __init__(
         self,
         base_url: str = "http://localhost:8000",
         framework: Optional[str] = None,
         auto_pause_check: bool = True,
         api_key: Optional[str] = None,
+        fail_silent: bool = True,
+        max_retries: int = 3,
+        capture_output: bool = True,
     ):
-        self.client = LighthouseClient(base_url=base_url, api_key=api_key)
+        self.client = LighthouseClient(
+            base_url=base_url,
+            api_key=api_key,
+            fail_silent=fail_silent,
+            max_retries=max_retries,
+        )
         self.framework = framework
         self.auto_pause_check = auto_pause_check
-        
-        self._current_trace_id: Optional[str] = None
-        self._current_span_id: Optional[str] = None
-        self._span_stack: list[str] = []
-    
+        self.fail_silent = fail_silent
+        self.capture_output_enabled = capture_output
+
+    # ------------------------------------------------------------------
+    # Properties (thread-safe via ContextVar)
+    # ------------------------------------------------------------------
+
     @property
     def trace_id(self) -> Optional[str]:
-        return self._current_trace_id
-    
+        """Get the current trace ID (thread/task-local)."""
+        return _active_trace_id.get(None)
+
     @property
     def span_id(self) -> Optional[str]:
-        return self._current_span_id
-    
+        """Get the current span ID (thread/task-local)."""
+        stack = self._get_span_stack()
+        return stack[-1] if stack else None
+
+    def _get_span_stack(self) -> list[str]:
+        """Get the span stack for the current thread/task."""
+        try:
+            return _active_span_stack.get()
+        except LookupError:
+            stack: list[str] = []
+            _active_span_stack.set(stack)
+            return stack
+
+    # ------------------------------------------------------------------
+    # Sync context managers
+    # ------------------------------------------------------------------
+
     @contextmanager
     def trace(
         self,
@@ -54,7 +178,7 @@ class LighthouseTracer:
     ):
         """
         Context manager for creating a trace.
-        
+
         with tracer.trace("My Workflow"):
             # All spans created here belong to this trace
             pass
@@ -65,20 +189,34 @@ class LighthouseTracer:
             framework=self.framework,
             metadata=metadata or {},
         )
-        self._current_trace_id = trace_data["trace_id"]
-        context_token = _active_tracer.set(self)
-        
+
+        trace_id = trace_data.get("trace_id")
+        if not trace_id:
+            # Backend unreachable — yield empty data, don't crash
+            logger.warning("Failed to create trace '%s' — backend may be unreachable", name)
+            yield {"trace_id": None, "name": name}
+            return
+
+        # Set context vars
+        tracer_token = _active_tracer.set(self)
+        trace_token = _active_trace_id.set(trace_id)
+        stack = self._get_span_stack()
+        prev_stack = stack.copy()
+        stack.clear()
+
         try:
             yield trace_data
-            self.client.complete_trace(self._current_trace_id, "success")
-        except Exception as e:
-            self.client.complete_trace(self._current_trace_id, "error")
+            self.client.complete_trace(trace_id, "success")
+        except Exception:
+            self.client.complete_trace(trace_id, "error")
             raise
         finally:
-            _active_tracer.reset(context_token)
-            self._current_trace_id = None
-            self._span_stack.clear()
-    
+            # Restore context
+            _active_tracer.reset(tracer_token)
+            _active_trace_id.reset(trace_token)
+            stack.clear()
+            stack.extend(prev_stack)
+
     @contextmanager
     def span(
         self,
@@ -91,22 +229,29 @@ class LighthouseTracer:
     ):
         """
         Context manager for creating a span within a trace.
-        
+
         with tracer.span("Process Data", kind="tool"):
             # Tool execution
             pass
         """
-        if not self._current_trace_id:
-            raise RuntimeError("No active trace. Use tracer.trace() first.")
-        
+        trace_id = self.trace_id
+        if not trace_id:
+            # No active trace — just run the code without tracing
+            yield {}
+            return
+
         # Check for pause if enabled
         if self.auto_pause_check:
-            self.client.wait_if_paused(self._current_trace_id)
-        
-        parent_span_id = self._span_stack[-1] if self._span_stack else None
-        
+            self.client.wait_if_paused(trace_id)
+
+        stack = self._get_span_stack()
+        parent_span_id = stack[-1] if stack else None
+
+        # Client-side timing
+        start_time = time.perf_counter()
+
         span_data = self.client.create_span(
-            trace_id=self._current_trace_id,
+            trace_id=trace_id,
             name=name,
             kind=kind,
             parent_span_id=parent_span_id,
@@ -115,154 +260,390 @@ class LighthouseTracer:
             input_data=input_data,
             attributes=attributes or {},
         )
-        
-        span_id = span_data["span_id"]
-        self._span_stack.append(span_id)
-        self._current_span_id = span_id
-        
+
+        span_id = span_data.get("span_id")
+        if not span_id:
+            # Span creation failed — run code without tracking
+            yield span_data
+            return
+
+        stack.append(span_id)
+
         try:
             yield span_data
-            
+
+            duration_ms = (time.perf_counter() - start_time) * 1000
             self.client.update_span(
-                trace_id=self._current_trace_id,
+                trace_id=trace_id,
                 span_id=span_id,
-                status="success"
+                status="success",
+                duration_ms=duration_ms,
             )
         except Exception as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000
             self.client.update_span(
-                trace_id=self._current_trace_id,
+                trace_id=trace_id,
                 span_id=span_id,
                 status="error",
-                error_message=str(e),
-                error_type=type(e).__name__
+                error_message=str(e)[:500],
+                error_type=type(e).__name__,
+                duration_ms=duration_ms,
             )
             raise
         finally:
-            self._span_stack.pop()
-            self._current_span_id = self._span_stack[-1] if self._span_stack else None
-    
+            if stack and stack[-1] == span_id:
+                stack.pop()
+
+    # ------------------------------------------------------------------
+    # Async context managers
+    # ------------------------------------------------------------------
+
+    @asynccontextmanager
+    async def atrace(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        metadata: Optional[dict] = None,
+    ):
+        """Async version of trace() context manager."""
+        # Run sync client calls in thread pool to avoid blocking event loop
+        loop = asyncio.get_running_loop()
+        trace_data = await loop.run_in_executor(
+            None,
+            lambda: self.client.create_trace(
+                name=name,
+                description=description,
+                framework=self.framework,
+                metadata=metadata or {},
+            ),
+        )
+
+        trace_id = trace_data.get("trace_id")
+        if not trace_id:
+            logger.warning("Failed to create async trace '%s'", name)
+            yield {"trace_id": None, "name": name}
+            return
+
+        tracer_token = _active_tracer.set(self)
+        trace_token = _active_trace_id.set(trace_id)
+        stack = self._get_span_stack()
+        prev_stack = stack.copy()
+        stack.clear()
+
+        try:
+            yield trace_data
+            await loop.run_in_executor(
+                None, lambda: self.client.complete_trace(trace_id, "success")
+            )
+        except Exception:
+            await loop.run_in_executor(
+                None, lambda: self.client.complete_trace(trace_id, "error")
+            )
+            raise
+        finally:
+            _active_tracer.reset(tracer_token)
+            _active_trace_id.reset(trace_token)
+            stack.clear()
+            stack.extend(prev_stack)
+
+    @asynccontextmanager
+    async def aspan(
+        self,
+        name: str,
+        kind: str = "internal",
+        agent_id: Optional[str] = None,
+        agent_name: Optional[str] = None,
+        input_data: Optional[dict] = None,
+        attributes: Optional[dict] = None,
+    ):
+        """Async version of span() context manager."""
+        trace_id = self.trace_id
+        if not trace_id:
+            yield {}
+            return
+
+        loop = asyncio.get_running_loop()
+
+        if self.auto_pause_check:
+            await loop.run_in_executor(
+                None, lambda: self.client.wait_if_paused(trace_id)
+            )
+
+        stack = self._get_span_stack()
+        parent_span_id = stack[-1] if stack else None
+
+        start_time = time.perf_counter()
+
+        span_data = await loop.run_in_executor(
+            None,
+            lambda: self.client.create_span(
+                trace_id=trace_id,
+                name=name,
+                kind=kind,
+                parent_span_id=parent_span_id,
+                agent_id=agent_id,
+                agent_name=agent_name,
+                input_data=input_data,
+                attributes=attributes or {},
+            ),
+        )
+
+        span_id = span_data.get("span_id")
+        if not span_id:
+            yield span_data
+            return
+
+        stack.append(span_id)
+
+        try:
+            yield span_data
+
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            await loop.run_in_executor(
+                None,
+                lambda: self.client.update_span(
+                    trace_id=trace_id,
+                    span_id=span_id,
+                    status="success",
+                    duration_ms=duration_ms,
+                ),
+            )
+        except Exception as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            await loop.run_in_executor(
+                None,
+                lambda: self.client.update_span(
+                    trace_id=trace_id,
+                    span_id=span_id,
+                    status="error",
+                    error_message=str(e)[:500],
+                    error_type=type(e).__name__,
+                    duration_ms=duration_ms,
+                ),
+            )
+            raise
+        finally:
+            if stack and stack[-1] == span_id:
+                stack.pop()
+
+    # ------------------------------------------------------------------
+    # Recording helpers
+    # ------------------------------------------------------------------
+
     def record_tokens(
         self,
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
         cost_usd: float = 0.0,
-        model: Optional[str] = None
-    ):
-        """Record token usage for the current span"""
-        if not self._current_trace_id or not self._current_span_id:
+        model: Optional[str] = None,
+    ) -> None:
+        """Record token usage for the current span."""
+        trace_id = self.trace_id
+        span_id = self.span_id
+        if not trace_id or not span_id:
             return
-        
+
         self.client.update_span(
-            trace_id=self._current_trace_id,
-            span_id=self._current_span_id,
+            trace_id=trace_id,
+            span_id=span_id,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=prompt_tokens + completion_tokens,
-            cost_usd=cost_usd
+            cost_usd=cost_usd,
         )
-    
+
+    def record_output(self, output_data: dict) -> None:
+        """Explicitly record output data for the current span."""
+        trace_id = self.trace_id
+        span_id = self.span_id
+        if not trace_id or not span_id:
+            return
+
+        self.client.update_span(
+            trace_id=trace_id,
+            span_id=span_id,
+            output_data=output_data,
+        )
+
     def update_state(
         self,
         memory: Optional[dict] = None,
         context: Optional[dict] = None,
-        variables: Optional[dict] = None
-    ):
-        """Update the trace state for inspection"""
-        if not self._current_trace_id:
+        variables: Optional[dict] = None,
+    ) -> None:
+        """Update the trace state for inspection from the dashboard."""
+        trace_id = self.trace_id
+        if not trace_id:
             return
-        
+
         self.client.update_state(
-            trace_id=self._current_trace_id,
+            trace_id=trace_id,
             memory=memory,
             context=context,
-            variables=variables
+            variables=variables,
         )
 
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
 
-# Global tracer instance
+    def close(self) -> None:
+        """Release resources held by the tracer."""
+        self.client.close()
+
+
+# ======================================================================
+# Global tracer singleton
+# ======================================================================
+
 _global_tracer: Optional[LighthouseTracer] = None
-_active_tracer: ContextVar[Optional[LighthouseTracer]] = ContextVar(
-    "active_lighthouse_tracer", default=None
-)
 
 
 def get_tracer(
     base_url: str = "http://localhost:8000",
     framework: Optional[str] = None,
     api_key: Optional[str] = None,
+    fail_silent: bool = True,
 ) -> LighthouseTracer:
-    """Get or create the global tracer instance"""
-    active_tracer = _active_tracer.get()
-    if active_tracer is not None:
-        return active_tracer
+    """Get or create the global tracer instance."""
+    # Prefer the context-local tracer (set inside a with trace() block)
+    active = _active_tracer.get(None)
+    if active is not None:
+        return active
 
     global _global_tracer
     if _global_tracer is None:
-        _global_tracer = LighthouseTracer(base_url=base_url, framework=framework, api_key=api_key)
+        _global_tracer = LighthouseTracer(
+            base_url=base_url,
+            framework=framework,
+            api_key=api_key,
+            fail_silent=fail_silent,
+        )
     return _global_tracer
 
 
+def reset_global_tracer() -> None:
+    """Reset the global tracer (useful in tests)."""
+    global _global_tracer
+    if _global_tracer is not None:
+        _global_tracer.close()
+        _global_tracer = None
+
+
+# ======================================================================
+# Decorators — support both sync and async functions
+# ======================================================================
+
 def trace_agent(
     name: Optional[str] = None,
-    agent_id: Optional[str] = None
+    agent_id: Optional[str] = None,
+    capture_output: bool = True,
 ):
     """
-    Decorator to trace an agent function.
-    
+    Decorator to trace an agent function. Works with both sync and async.
+
     @trace_agent("Research Agent")
     def research_agent(query):
-        # Agent logic
         return result
+
+    @trace_agent("Async Agent")
+    async def async_agent(query):
+        return await result
     """
     def decorator(func: Callable) -> Callable:
         agent_name = name or func.__name__
-        
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            tracer = get_tracer()
-            if not tracer.trace_id:
-                # No active trace, just run the function
-                return func(*args, **kwargs)
-            
-            with tracer.span(
-                name=agent_name,
-                kind="agent",
-                agent_id=agent_id or str(uuid.uuid4()),
-                agent_name=agent_name,
-                input_data={"args": str(args)[:500], "kwargs": str(kwargs)[:500]}
-            ):
-                return func(*args, **kwargs)
-        
-        return wrapper
+        _agent_id = agent_id or f"agent-{func.__name__}"
+
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                tracer = get_tracer()
+                if not tracer.trace_id:
+                    return await func(*args, **kwargs)
+
+                input_data = _capture_args(args, kwargs)
+                async with tracer.aspan(
+                    name=agent_name,
+                    kind="agent",
+                    agent_id=_agent_id,
+                    agent_name=agent_name,
+                    input_data=input_data,
+                ):
+                    result = await func(*args, **kwargs)
+                    if capture_output and tracer.capture_output_enabled:
+                        tracer.record_output(_capture_output(result) or {})
+                    return result
+            return async_wrapper
+        else:
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                tracer = get_tracer()
+                if not tracer.trace_id:
+                    return func(*args, **kwargs)
+
+                input_data = _capture_args(args, kwargs)
+                with tracer.span(
+                    name=agent_name,
+                    kind="agent",
+                    agent_id=_agent_id,
+                    agent_name=agent_name,
+                    input_data=input_data,
+                ):
+                    result = func(*args, **kwargs)
+                    if capture_output and tracer.capture_output_enabled:
+                        tracer.record_output(_capture_output(result) or {})
+                    return result
+            return sync_wrapper
     return decorator
 
 
-def trace_tool(name: Optional[str] = None):
+def trace_tool(name: Optional[str] = None, capture_output: bool = True):
     """
-    Decorator to trace a tool function.
-    
+    Decorator to trace a tool function. Works with both sync and async.
+
     @trace_tool("Web Search")
     def search_web(query):
-        # Tool logic
         return results
     """
     def decorator(func: Callable) -> Callable:
         tool_name = name or func.__name__
-        
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            tracer = get_tracer()
-            if not tracer.trace_id:
-                return func(*args, **kwargs)
-            
-            with tracer.span(
-                name=tool_name,
-                kind="tool",
-                input_data={"args": str(args)[:500], "kwargs": str(kwargs)[:500]}
-            ):
-                return func(*args, **kwargs)
-        
-        return wrapper
+
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                tracer = get_tracer()
+                if not tracer.trace_id:
+                    return await func(*args, **kwargs)
+
+                input_data = _capture_args(args, kwargs)
+                async with tracer.aspan(
+                    name=tool_name,
+                    kind="tool",
+                    input_data=input_data,
+                ):
+                    result = await func(*args, **kwargs)
+                    if capture_output and tracer.capture_output_enabled:
+                        tracer.record_output(_capture_output(result) or {})
+                    return result
+            return async_wrapper
+        else:
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                tracer = get_tracer()
+                if not tracer.trace_id:
+                    return func(*args, **kwargs)
+
+                input_data = _capture_args(args, kwargs)
+                with tracer.span(
+                    name=tool_name,
+                    kind="tool",
+                    input_data=input_data,
+                ):
+                    result = func(*args, **kwargs)
+                    if capture_output and tracer.capture_output_enabled:
+                        tracer.record_output(_capture_output(result) or {})
+                    return result
+            return sync_wrapper
     return decorator
 
 
@@ -270,50 +651,92 @@ def trace_llm(
     name: str = "LLM Call",
     model: Optional[str] = None,
     cost_per_1k_prompt: float = 0.0,
-    cost_per_1k_completion: float = 0.0
+    cost_per_1k_completion: float = 0.0,
+    capture_output: bool = True,
 ):
     """
-    Decorator to trace an LLM call.
-    
+    Decorator to trace an LLM call. Works with both sync and async.
+    Automatically extracts token usage from OpenAI-style responses.
+
     @trace_llm("GPT-4 Call", model="gpt-4", cost_per_1k_prompt=0.03)
     def call_gpt4(prompt):
         response = openai.chat(...)
         return response
     """
     def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            tracer = get_tracer()
-            if not tracer.trace_id:
-                return func(*args, **kwargs)
-            
-            with tracer.span(
-                name=name,
-                kind="llm",
-                input_data={"args": str(args)[:500]},
-                attributes={"model": model} if model else {}
-            ):
-                result = func(*args, **kwargs)
-                
-                # Try to extract token usage from result
-                if hasattr(result, "usage"):
-                    usage = result.usage
-                    prompt_tokens = getattr(usage, "prompt_tokens", 0)
-                    completion_tokens = getattr(usage, "completion_tokens", 0)
-                    
-                    cost = (
-                        (prompt_tokens / 1000) * cost_per_1k_prompt +
-                        (completion_tokens / 1000) * cost_per_1k_completion
+
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                tracer = get_tracer()
+                if not tracer.trace_id:
+                    return await func(*args, **kwargs)
+
+                input_data = _capture_args(args, kwargs)
+                async with tracer.aspan(
+                    name=name,
+                    kind="llm",
+                    input_data=input_data,
+                    attributes={"model": model} if model else {},
+                ):
+                    result = await func(*args, **kwargs)
+                    _extract_and_record_tokens(
+                        tracer, result, model, cost_per_1k_prompt, cost_per_1k_completion
                     )
-                    
-                    tracer.record_tokens(
-                        prompt_tokens=prompt_tokens,
-                        completion_tokens=completion_tokens,
-                        cost_usd=cost,
-                        model=model
+                    if capture_output and tracer.capture_output_enabled:
+                        tracer.record_output(_capture_output(result) or {})
+                    return result
+            return async_wrapper
+        else:
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                tracer = get_tracer()
+                if not tracer.trace_id:
+                    return func(*args, **kwargs)
+
+                input_data = _capture_args(args, kwargs)
+                with tracer.span(
+                    name=name,
+                    kind="llm",
+                    input_data=input_data,
+                    attributes={"model": model} if model else {},
+                ):
+                    result = func(*args, **kwargs)
+                    _extract_and_record_tokens(
+                        tracer, result, model, cost_per_1k_prompt, cost_per_1k_completion
                     )
-                
-                return result
-        
-        return wrapper
+                    if capture_output and tracer.capture_output_enabled:
+                        tracer.record_output(_capture_output(result) or {})
+                    return result
+            return sync_wrapper
     return decorator
+
+
+def _extract_and_record_tokens(
+    tracer: LighthouseTracer,
+    result: Any,
+    model: Optional[str],
+    cost_per_1k_prompt: float,
+    cost_per_1k_completion: float,
+) -> None:
+    """Safely extract token usage from an OpenAI-style response."""
+    try:
+        if not hasattr(result, "usage"):
+            return
+        usage = result.usage
+        prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+
+        cost = (
+            (prompt_tokens / 1000) * cost_per_1k_prompt
+            + (completion_tokens / 1000) * cost_per_1k_completion
+        )
+
+        tracer.record_tokens(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cost_usd=cost,
+            model=model,
+        )
+    except Exception:  # noqa: BLE001
+        logger.debug("Could not extract token usage from LLM result", exc_info=True)

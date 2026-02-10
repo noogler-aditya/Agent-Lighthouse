@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     build_version: str = Field(default="dev", alias="BUILD_VERSION")
 
+    # PostgreSQL — user storage
+    database_url: str = Field(
+        default="postgresql://lighthouse:lighthouse@localhost:5432/lighthouse",
+        alias="DATABASE_URL",
+    )
+
+    # Redis — trace/span/state storage
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
     redis_connect_timeout_seconds: int = Field(default=5, alias="REDIS_CONNECT_TIMEOUT_SECONDS")
     redis_required_appendonly: str = Field(default="yes", alias="REDIS_REQUIRED_APPENDONLY")
@@ -29,6 +36,7 @@ class Settings(BaseSettings):
     allowed_origins: str = Field(default="http://localhost:5173", alias="ALLOWED_ORIGINS")
     cors_allow_credentials: bool = Field(default=False, alias="CORS_ALLOW_CREDENTIALS")
 
+    # Auth settings
     require_auth: bool = Field(default=True, alias="REQUIRE_AUTH")
     jwt_secret: str = Field(default="change-me-jwt-secret", alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
@@ -37,11 +45,7 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = Field(default=15, alias="ACCESS_TOKEN_TTL_MINUTES")
     refresh_token_ttl_minutes: int = Field(default=43200, alias="REFRESH_TOKEN_TTL_MINUTES")
 
-    auth_users: str = Field(
-        default="admin:admin:admin,operator:operator:operator,viewer:viewer:viewer",
-        alias="AUTH_USERS",
-    )
-
+    # Machine API keys for backward-compatible SDK access (optional)
     machine_api_keys: str = Field(default="", alias="MACHINE_API_KEYS")
     legacy_api_key: str = Field(default="local-dev-key", alias="LIGHTHOUSE_API_KEY")
 
@@ -61,20 +65,6 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
-
-    @property
-    def auth_users_map(self) -> dict[str, dict[str, str]]:
-        users: dict[str, dict[str, str]] = {}
-        for raw in self.auth_users.split(","):
-            raw = raw.strip()
-            if not raw:
-                continue
-            parts = [segment.strip() for segment in raw.split(":")]
-            if len(parts) != 3:
-                continue
-            username, password, role = parts
-            users[username] = {"password": password, "role": role}
-        return users
 
     @property
     def machine_api_keys_map(self) -> dict[str, set[str]]:

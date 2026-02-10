@@ -88,19 +88,25 @@ Default local API key in `docker-compose.yml`: `local-dev-key`.
 # 1. Start Redis
 docker run -d -p 6379:6379 redis:7-alpine
 
-# 2. Start Backend
+# 2. Start PostgreSQL
+docker run -d -p 5432:5432 \
+  -e POSTGRES_USER=lighthouse \
+  -e POSTGRES_PASSWORD=lighthouse \
+  -e POSTGRES_DB=lighthouse \
+  postgres:16-alpine
+
+# 3. Start Backend
 cd backend
 pip install -r requirements.txt
 export MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
 export JWT_SECRET=dev-secret
 export ALLOWED_ORIGINS=http://localhost:5173
+export DATABASE_URL=postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
 python3 -m uvicorn main:app --reload --port 8000
 
-# 3. Start Frontend (new terminal)
+# 4. Start Frontend (new terminal)
 cd frontend
 npm install
-export VITE_AUTH_USERNAME=viewer
-export VITE_AUTH_PASSWORD=viewer
 npm run dev
 ```
 
@@ -112,7 +118,7 @@ npm run dev
 | **API Docs** | http://localhost:8000/docs |
 | **WebSocket** | ws://localhost:8000/ws |
 
-UI requests use `Authorization: Bearer <token>` after `/api/auth/login`.
+UI requests use `Authorization: Bearer <token>` after `/api/auth/register` or `/api/auth/login`.
 Machine-to-machine SDK ingestion uses scoped `X-API-Key`.
 
 ### Verification Flow (Recommended)
@@ -125,10 +131,14 @@ curl http://localhost:8000/health/live
 curl http://localhost:8000/health/ready
 
 # 2) User auth and trace list API
-TOKEN=$(curl -s http://localhost:8000/api/auth/login \
+# First-time setup (register). If you get a 409, use /api/auth/login instead.
+TOKEN=$(curl -s http://localhost:8000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"viewer","password":"viewer"}' | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+  -d '{"username":"demo","password":"demo"}' | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/traces
+
+# Optional: use the API key returned by /api/auth/register for SDK ingestion
+# curl -H "X-API-Key: <api_key>" http://localhost:8000/api/traces
 
 # 3) Deterministic smoke trace ingestion
 cd sdk
@@ -146,8 +156,8 @@ Expected results:
 Use this checklist:
 
 1. Confirm frontend auth and backend auth settings:
-   - frontend signs in via `/api/auth/login`
-   - backend has valid `JWT_SECRET`, `AUTH_USERS`, `ALLOWED_ORIGINS`
+   - frontend signs in via `/api/auth/register` or `/api/auth/login`
+   - backend has valid `JWT_SECRET`, `DATABASE_URL`, `ALLOWED_ORIGINS`
 2. Confirm frontend backend URL:
    - `VITE_API_URL` should point to `http://localhost:8000`
 3. Confirm backend CORS origin:

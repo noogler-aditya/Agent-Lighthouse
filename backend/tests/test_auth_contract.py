@@ -2,20 +2,21 @@ from config import get_settings
 from security import create_access_token
 
 
-def _bearer(role: str) -> dict[str, str]:
+def _bearer(subject: str) -> dict[str, str]:
     settings = get_settings()
-    token = create_access_token(settings, subject=f"test-{role}", role=role)
+    token = create_access_token(settings, subject=subject)
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_viewer_can_read_but_cannot_write(client_and_store):
+def test_user_can_read_and_write(client_and_store):
     client, _, _ = client_and_store
 
-    read = client.get("/api/traces", headers=_bearer("viewer"))
+    headers = _bearer("test-user")
+    read = client.get("/api/traces", headers=headers)
     assert read.status_code == 200
 
-    write = client.post("/api/traces", headers=_bearer("viewer"), json={"name": "blocked"})
-    assert write.status_code == 403
+    write = client.post("/api/traces", headers=headers, json={"name": "allowed"})
+    assert write.status_code == 200
 
 
 def test_machine_key_scope_allows_trace_ingestion_only(client_and_store):

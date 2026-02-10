@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from dependencies import get_connection_manager, get_redis
 from models.state import AgentState, ExecutionControl
 from rate_limit import enforce_read_rate_limit, enforce_write_rate_limit
-from security import require_role
+from security import require_auth
 from services.connection_manager import ConnectionManager
 from services.redis_service import RedisService
 
@@ -59,7 +59,7 @@ async def _ensure_trace_exists(trace_id: str, redis: RedisService):
 async def get_state(
     trace_id: str,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("viewer")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_read_rate_limit),
 ):
     """Get current state for a trace"""
@@ -74,7 +74,7 @@ async def initialize_state(
     trace_id: str,
     request: InitStateRequest,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Initialize state for a trace"""
@@ -100,7 +100,7 @@ async def modify_state(
     request: ModifyStateRequest,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Modify a specific path in the state"""
@@ -134,7 +134,7 @@ async def bulk_modify_state(
     request: BulkModifyStateRequest,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Bulk modify state containers"""
@@ -173,7 +173,7 @@ async def pause_execution(
     span_id: Optional[str] = None,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Pause execution at the current point"""
@@ -203,7 +203,7 @@ async def resume_execution(
     trace_id: str,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Resume paused execution"""
@@ -229,7 +229,7 @@ async def step_execution(
     request: StepRequest,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Execute N steps then pause"""
@@ -252,7 +252,7 @@ async def step_execution(
 async def get_control_status(
     trace_id: str,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("viewer")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_read_rate_limit),
 ):
     """Get current execution control status"""
@@ -276,7 +276,7 @@ async def set_breakpoints(
     trace_id: str,
     request: BreakpointRequest,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Set breakpoints for debugging"""
@@ -307,7 +307,7 @@ async def take_snapshot(
     span_id: str,
     description: Optional[str] = None,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Take a snapshot of current state"""
@@ -325,7 +325,7 @@ async def take_snapshot(
 async def list_snapshots(
     trace_id: str,
     redis: RedisService = Depends(get_redis),
-    _auth=Depends(require_role("viewer")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_read_rate_limit),
 ):
     """List all state snapshots for a trace"""
@@ -342,7 +342,7 @@ async def restore_snapshot(
     snapshot_id: str,
     redis: RedisService = Depends(get_redis),
     connection_manager: ConnectionManager = Depends(get_connection_manager),
-    _auth=Depends(require_role("operator")),
+    _auth=Depends(require_auth()),
     _rate=Depends(enforce_write_rate_limit),
 ):
     """Restore state from a snapshot"""

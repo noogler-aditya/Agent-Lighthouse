@@ -1,12 +1,21 @@
-import { useState } from 'react';
-import { Bot, Cpu, Radar, RefreshCcw, Trash2, Wrench } from '../icons/AppIcons';
+import { useState, useMemo } from 'react';
+import { Bot, Cpu, Download, Filter, Radar, RefreshCcw, Trash2, Wrench } from '../icons/AppIcons';
 import './Sidebar.css';
+
+const STATUS_OPTIONS = [
+    { value: '', label: 'All Status' },
+    { value: 'running', label: '● Running' },
+    { value: 'success', label: '✓ Success' },
+    { value: 'error', label: '✕ Error' },
+    { value: 'cancelled', label: '○ Cancelled' },
+];
 
 export default function Sidebar({
     traces,
     selectedTraceId,
     onSelectTrace,
     onDeleteTrace,
+    onExportTrace,
     canDeleteTraces = false,
     loading,
     isConnected,
@@ -16,10 +25,45 @@ export default function Sidebar({
     onRetry,
 }) {
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [sortBy, setSortBy] = useState('newest'); // newest, oldest, cost, tokens
 
-    const filteredTraces = traces.filter(trace =>
-        trace.name.toLowerCase().includes(search.toLowerCase())
-    );
+    // Memoized filtering + sorting
+    const filteredTraces = useMemo(() => {
+        let result = traces;
+
+        // Text search
+        if (search) {
+            const searchLower = search.toLowerCase();
+            result = result.filter(trace =>
+                trace.name.toLowerCase().includes(searchLower) ||
+                (trace.framework && trace.framework.toLowerCase().includes(searchLower))
+            );
+        }
+
+        // Status filter
+        if (statusFilter) {
+            result = result.filter(trace => trace.status === statusFilter);
+        }
+
+        // Sort
+        result = [...result].sort((a, b) => {
+            switch (sortBy) {
+                case 'oldest':
+                    return new Date(a.start_time) - new Date(b.start_time);
+                case 'cost':
+                    return (b.total_cost_usd || 0) - (a.total_cost_usd || 0);
+                case 'tokens':
+                    return (b.total_tokens || 0) - (a.total_tokens || 0);
+                case 'newest':
+                default:
+                    return new Date(b.start_time) - new Date(a.start_time);
+            }
+        });
+
+        return result;
+    }, [traces, search, statusFilter, sortBy]);
 
     const formatTime = (dateStr) => {
         const date = new Date(dateStr);
@@ -47,6 +91,14 @@ export default function Sidebar({
         return new Date(lastFetchAt).toLocaleTimeString();
     };
 
+    // Summary stats
+    const stats = useMemo(() => {
+        const running = traces.filter(t => t.status === 'running').length;
+        const errors = traces.filter(t => t.status === 'error').length;
+        const totalCost = traces.reduce((sum, t) => sum + (t.total_cost_usd || 0), 0);
+        return { running, errors, totalCost };
+    }, [traces]);
+
     return (
         <div className="sidebar" data-animate="enter">
             {/* Header */}
@@ -61,15 +113,69 @@ export default function Sidebar({
                 </div>
             </div>
 
-            {/* Search */}
+            {/* Search + Filters */}
             <div className="sidebar-search" data-animate="enter" data-delay="2">
-                <input
-                    type="search"
-                    placeholder="Search traces..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
+                <div className="search-row">
+                    <input
+                        type="search"
+                        placeholder="Search traces or frameworks..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        id="sidebar-search-input"
+                    />
+                    <button
+                        className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
+                        onClick={() => setShowFilters(!showFilters)}
+                        title="Toggle filters"
+                        aria-label="Toggle filters"
+                    >
+                        <Filter className="ui-icon ui-icon-sm" />
+                        {(statusFilter) && <span className="filter-badge" />}
+                    </button>
+                </div>
+
+                {showFilters && (
+                    <div className="filter-panel" data-animate="enter">
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="filter-select"
+                            id="sidebar-status-filter"
+                        >
+                            {STATUS_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="filter-select"
+                            id="sidebar-sort-select"
+                        >
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="cost">Highest Cost</option>
+                            <option value="tokens">Most Tokens</option>
+                        </select>
+                    </div>
+                )}
             </div>
+
+            {/* Quick Stats Bar */}
+            {traces.length > 0 && (
+                <div className="sidebar-stats-bar">
+                    <span className="sidebar-stat-pill">{traces.length} traces</span>
+                    {stats.running > 0 && (
+                        <span className="sidebar-stat-pill running">{stats.running} running</span>
+                    )}
+                    {stats.errors > 0 && (
+                        <span className="sidebar-stat-pill error">{stats.errors} errors</span>
+                    )}
+                    {stats.totalCost > 0 && (
+                        <span className="sidebar-stat-pill cost">${stats.totalCost.toFixed(4)}</span>
+                    )}
+                </div>
+            )}
 
             {/* Traces List */}
             <div className="traces-list">
@@ -90,7 +196,7 @@ export default function Sidebar({
                     </div>
                 ) : filteredTraces.length === 0 ? (
                     <div className="list-empty">
-                        {search ? 'No matching traces' : 'No traces yet'}
+                        {search || statusFilter ? 'No matching traces' : 'No traces yet'}
                     </div>
                 ) : (
                     filteredTraces.map((trace, index) => (
@@ -129,19 +235,35 @@ export default function Sidebar({
                                     ${trace.total_cost_usd.toFixed(4)}
                                 </span>
                             </div>
-                            {onDeleteTrace && canDeleteTraces && (
-                                <button
-                                    className="delete-btn"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onDeleteTrace(trace.trace_id);
-                                    }}
-                                    title="Delete trace"
-                                    aria-label="Delete trace"
-                                >
-                                    <Trash2 className="ui-icon ui-icon-xs" />
-                                </button>
-                            )}
+                            {/* Action buttons */}
+                            <div className="trace-actions">
+                                {onExportTrace && (
+                                    <button
+                                        className="action-btn export-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onExportTrace(trace.trace_id, trace.name);
+                                        }}
+                                        title="Export trace as JSON"
+                                        aria-label="Export trace"
+                                    >
+                                        <Download className="ui-icon ui-icon-xs" />
+                                    </button>
+                                )}
+                                {onDeleteTrace && canDeleteTraces && (
+                                    <button
+                                        className="action-btn delete-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDeleteTrace(trace.trace_id);
+                                        }}
+                                        title="Delete trace"
+                                        aria-label="Delete trace"
+                                    >
+                                        <Trash2 className="ui-icon ui-icon-xs" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))
                 )}
@@ -149,7 +271,12 @@ export default function Sidebar({
 
             {/* Footer */}
             <div className="sidebar-footer">
-                <span className="trace-count">{traces.length} traces</span>
+                <span className="trace-count">
+                    {filteredTraces.length === traces.length
+                        ? `${traces.length} traces`
+                        : `${filteredTraces.length} of ${traces.length} traces`
+                    }
+                </span>
             </div>
         </div>
     );

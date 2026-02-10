@@ -7,6 +7,10 @@ python-multipart==0.0.22
 # Redis
 redis==5.0.1
 
+# PostgreSQL
+asyncpg>=0.29.0
+bcrypt>=4.0.0
+
 # Data validation
 pydantic==2.6.1
 pydantic-settings==2.1.0

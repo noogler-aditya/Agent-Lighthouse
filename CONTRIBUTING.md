@@ -25,13 +25,12 @@ pip install -r requirements.txt
 export JWT_SECRET=dev-secret
 export MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
 export ALLOWED_ORIGINS=http://localhost:5173
+export DATABASE_URL=postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
 python3 -m uvicorn main:app --reload --port 8000
 
 # Frontend (new terminal)
 cd frontend
 npm install
-export VITE_AUTH_USERNAME=viewer
-export VITE_AUTH_PASSWORD=viewer
 npm run dev
 
 # SDK smoke check

@@ -1,5 +1,6 @@
 """
 Deterministic smoke test for Agent Lighthouse trace ingestion.
+Tests the enterprise-grade SDK with fail-silent mode, output capture, and async support.
 """
 import os
 import sys
@@ -17,6 +18,7 @@ def main() -> None:
         base_url=os.getenv("LIGHTHOUSE_BASE_URL", "http://localhost:8000"),
         framework="smoke-test",
         api_key=os.getenv("LIGHTHOUSE_API_KEY", "local-dev-key"),
+        fail_silent=True,  # Never crash the smoke test itself
     )
 
     with tracer.trace(
@@ -33,6 +35,10 @@ def main() -> None:
         ):
             tracer.record_tokens(prompt_tokens=25, completion_tokens=10, cost_usd=0.0007)
             tracer.update_state(memory={"phase": "agent"}, variables={"ok": True})
+
+            # New: test output recording
+            tracer.record_output({"result": "agent completed"})
+
             with tracer.span(
                 name="Smoke Tool",
                 kind="tool",
@@ -40,9 +46,13 @@ def main() -> None:
                 agent_name="Smoke Agent",
                 input_data={"tool": "noop"},
             ):
-                pass
+                # Note: output is now auto-captured by decorators
+                tracer.record_output({"tool_result": "success"})
 
-    trace_id = trace_info["trace_id"]
+    trace_id = trace_info.get("trace_id")
+    if not trace_id:
+        fail("Failed to create trace (backend may be unreachable)")
+
     trace = tracer.client.get_trace(trace_id)
 
     if not trace:
@@ -61,6 +71,9 @@ def main() -> None:
     print(f"Trace ID: {trace_id}")
     print(f"Span count: {len(spans)}")
     print(f"Status: {status}")
+
+    # Cleanup
+    tracer.close()
 
 
 if __name__ == "__main__":

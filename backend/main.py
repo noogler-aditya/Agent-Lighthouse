@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
+from database import init_db, close_db
 from routers import agents_router, auth_router, state_router, traces_router, websocket_router
 from security import auth_health
 from services.connection_manager import ConnectionManager
@@ -44,7 +45,12 @@ _validate_security_defaults()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan - connect/disconnect Redis and run readiness gates."""
+    """Application lifespan - connect/disconnect PostgreSQL, Redis."""
+    # PostgreSQL — user storage
+    db_pool = await init_db(settings.database_url)
+    app.state.db_pool = db_pool
+
+    # Redis — trace/span/state storage
     redis_service = RedisService(
         redis_url=settings.redis_url,
         trace_ttl_hours=settings.trace_ttl_hours,
@@ -68,6 +74,7 @@ async def lifespan(app: FastAPI):
 
     await redis_service.disconnect()
     logger.info("Disconnected from Redis")
+    await close_db()
 
 
 app = FastAPI(
@@ -100,17 +107,17 @@ async def request_context_middleware(request: Request, call_next):
 
         principal = getattr(request.state, "principal", None)
         subject = getattr(principal, "subject", "anonymous")
-        role = getattr(principal, "role", "-")
+        auth_type = getattr(principal, "auth_type", "-")
         trace_id = request.path_params.get("trace_id") if hasattr(request, "path_params") else None
         logger.info(
-            "request_id=%s method=%s path=%s status=%s latency_ms=%s subject=%s role=%s trace_id=%s",
+            "request_id=%s method=%s path=%s status=%s latency_ms=%s subject=%s auth_type=%s trace_id=%s",
             request_id,
             request.method,
             request.url.path,
             response.status_code,
             elapsed_ms,
             subject,
-            role,
+            auth_type,
             trace_id or "-",
         )
         response.headers["X-Request-ID"] = request_id

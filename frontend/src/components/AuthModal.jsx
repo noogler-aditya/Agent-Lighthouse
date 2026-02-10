@@ -1,14 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bot } from './icons/AppIcons';
 
-export function AuthModal({ isOpen, onClose, onLogin }) {
+export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
     const [isRegister, setIsRegister] = useState(false);
-    const [username, setUsername] = useState('viewer');
-    const [password, setPassword] = useState('viewer');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [registrationComplete, setRegistrationComplete] = useState(false);
+    const [registeredApiKey, setRegisteredApiKey] = useState('');
+    const [copyStatus, setCopyStatus] = useState('');
 
-    if (!isOpen) return null;
+    useEffect(() => {
+        if (!isOpen) return;
+        setIsRegister(false);
+        setUsername('');
+        setPassword('');
+        setConfirmPassword('');
+        setError('');
+        setLoading(false);
+        setRegistrationComplete(false);
+        setRegisteredApiKey('');
+        setCopyStatus('');
+    }, [isOpen]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -19,14 +34,39 @@ export function AuthModal({ isOpen, onClose, onLogin }) {
         await new Promise(r => setTimeout(r, 600));
 
         try {
-            await onLogin(username, password);
-            onClose();
+            if (isRegister) {
+                if (password !== confirmPassword) {
+                    throw new Error('Passwords do not match');
+                }
+                if (!onRegister) {
+                    throw new Error('Registration is unavailable');
+                }
+                const result = await onRegister(username, password);
+                setRegisteredApiKey(result?.apiKey || '');
+                setRegistrationComplete(true);
+                setCopyStatus('');
+            } else {
+                await onLogin(username, password);
+                onClose();
+            }
         } catch (err) {
             setError(err.message || 'Authentication failed');
         } finally {
             setLoading(false);
         }
     };
+
+    const handleCopyApiKey = async () => {
+        if (!registeredApiKey) return;
+        try {
+            await navigator.clipboard.writeText(registeredApiKey);
+            setCopyStatus('Copied to clipboard');
+        } catch {
+            setCopyStatus('Copy failed');
+        }
+    };
+
+    if (!isOpen) return null;
 
     return (
         <div className="auth-overlay" onClick={onClose}>
@@ -35,53 +75,103 @@ export function AuthModal({ isOpen, onClose, onLogin }) {
                     <div className="auth-logo">
                         <Bot className="ui-icon" />
                     </div>
-                    <h2>{isRegister ? 'Create Account' : 'Welcome Back'}</h2>
-                    <p>{isRegister ? 'Start monitoring your agents today' : 'Sign in to Agent Lighthouse'}</p>
+                    <h2>
+                        {registrationComplete
+                            ? 'Account created'
+                            : (isRegister ? 'Create Account' : 'Welcome Back')}
+                    </h2>
+                    <p>
+                        {registrationComplete
+                            ? 'Copy your API key now. You will not be able to view it again.'
+                            : (isRegister ? 'Start monitoring your agents today' : 'Sign in to Agent Lighthouse')}
+                    </p>
                 </div>
 
-                <div className="auth-tabs">
-                    <button
-                        className={`auth-tab ${!isRegister ? 'active' : ''}`}
-                        onClick={() => setIsRegister(false)}
-                    >
-                        Sign In
-                    </button>
-                    <button
-                        className={`auth-tab ${isRegister ? 'active' : ''}`}
-                        onClick={() => setIsRegister(true)}
-                    >
-                        Register
-                    </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="auth-form">
-                    <div className="form-group">
-                        <label>Username</label>
-                        <input
-                            type="text"
-                            value={username}
-                            onChange={e => setUsername(e.target.value)}
-                            placeholder="Enter your username"
-                            autoFocus
-                        />
+                {!registrationComplete && (
+                    <div className="auth-tabs">
+                        <button
+                            className={`auth-tab ${!isRegister ? 'active' : ''}`}
+                            onClick={() => setIsRegister(false)}
+                        >
+                            Sign In
+                        </button>
+                        <button
+                            className={`auth-tab ${isRegister ? 'active' : ''}`}
+                            onClick={() => setIsRegister(true)}
+                        >
+                            Register
+                        </button>
                     </div>
+                )}
 
-                    <div className="form-group">
-                        <label>Password</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                        />
+                {registrationComplete ? (
+                    <div className="auth-success">
+                        <div className="form-group">
+                            <label>Your API Key</label>
+                            <div className="api-key-row">
+                                <input
+                                    type="text"
+                                    value={registeredApiKey || 'Unavailable'}
+                                    readOnly
+                                />
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={handleCopyApiKey}
+                                    disabled={!registeredApiKey}
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                            {copyStatus && <div className="auth-note">{copyStatus}</div>}
+                        </div>
+
+                        <button type="button" className="btn btn-primary btn-block" onClick={onClose}>
+                            Continue
+                        </button>
                     </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className="auth-form">
+                        <div className="form-group">
+                            <label>Username</label>
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                placeholder="Enter your username"
+                                autoFocus
+                            />
+                        </div>
 
-                    {error && <div className="auth-error">{error}</div>}
+                        <div className="form-group">
+                            <label>Password</label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                            />
+                        </div>
 
-                    <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-                        {loading ? 'Processing...' : (isRegister ? 'Create Account' : 'Sign In')}
-                    </button>
-                </form>
+                        {isRegister && (
+                            <div className="form-group">
+                                <label>Confirm Password</label>
+                                <input
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={e => setConfirmPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                        )}
+
+                        {error && <div className="auth-error">{error}</div>}
+
+                        <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+                            {loading ? 'Processing...' : (isRegister ? 'Create Account' : 'Sign In')}
+                        </button>
+                    </form>
+                )}
 
                 <p className="auth-footer">
                     By continuing, you agree to our Terms of Service and Privacy Policy.
@@ -192,6 +282,17 @@ export function AuthModal({ isOpen, onClose, onLogin }) {
           transition: border-color 0.2s;
         }
 
+        .api-key-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .api-key-row input {
+          flex: 1;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
         .form-group input:focus {
           border-color: var(--accent-primary);
           outline: none;
@@ -213,6 +314,19 @@ export function AuthModal({ isOpen, onClose, onLogin }) {
           background: rgba(239, 68, 68, 0.1);
           padding: 8px;
           border-radius: 8px;
+        }
+
+        .auth-success {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .auth-note {
+          margin-top: 8px;
+          font-size: 12px;
+          color: var(--text-muted);
+          text-align: center;
         }
 
         .auth-footer {

@@ -1,16 +1,18 @@
 import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
-import { Coins, SearchCode } from './components/icons/AppIcons';
-import { AUTH_BOOTSTRAP_PASSWORD, AUTH_BOOTSTRAP_USERNAME } from './config';
-import { bootstrapSession, clearSession, getAuthContext, loginWithPassword } from './auth/session';
-import { useWebSocket, useTraces, useAgentState } from './hooks';
+import { Clock, Coins, SearchCode } from './components/icons/AppIcons';
+import { API_URL } from './config';
+import { bootstrapSession, clearSession, getAuthContext, loginWithPassword, registerWithPassword, authFetch } from './auth/session';
+import { useWebSocket, useTraces, useAgentState, useToast } from './hooks';
 import { Sidebar } from './components/Sidebar';
 import { LandingPage } from './components/LandingPage';
 import { AuthModal } from './components/AuthModal';
+import ToastContainer from './components/ToastContainer';
 import './App.css';
 
 const TraceGraph = lazy(() => import('./components/TraceGraph/TraceGraph'));
 const TokenMonitor = lazy(() => import('./components/TokenMonitor/TokenMonitor'));
 const StateInspector = lazy(() => import('./components/StateInspector/StateInspector'));
+const Timeline = lazy(() => import('./components/Timeline/Timeline'));
 
 function App() {
   const [activeRightTab, setActiveRightTab] = useState('tokens');
@@ -20,6 +22,9 @@ function App() {
 
   // Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Toast notifications
+  const { toasts, removeToast, success, error: showError, warning, info } = useToast();
 
   // WebSocket connection
   const { isConnected, onMessage, subscribeToTrace, unsubscribeFromTrace } = useWebSocket(authContext.isAuthenticated);
@@ -74,18 +79,81 @@ function App() {
     const ctx = await loginWithPassword(username, password);
     setAuthContext(ctx);
     setIsAuthModalOpen(false);
+    success('Signed in successfully');
+  }, [success]);
+
+  const handleRegister = useCallback(async (username, password) => {
+    const result = await registerWithPassword(username, password);
+    success('Account created');
+    return { apiKey: result.apiKey };
+  }, [success]);
+
+  const handleAuthModalClose = useCallback(() => {
+    setIsAuthModalOpen(false);
+    setAuthContext(getAuthContext());
   }, []);
 
   const handleLogout = useCallback(() => {
     clearSession();
     setAuthContext(getAuthContext());
     setSelectedSpan(null);
-  }, []);
+    info('Signed out');
+  }, [info]);
 
   // Handle trace selection
   const handleSelectTrace = useCallback(async (traceId) => {
     await fetchTrace(traceId);
   }, [fetchTrace]);
+
+  // Handle trace deletion with toast feedback
+  const handleDeleteTrace = useCallback(async (traceId) => {
+    try {
+      await deleteTrace(traceId);
+      success('Trace deleted');
+    } catch {
+      showError('Failed to delete trace');
+    }
+  }, [deleteTrace, success, showError]);
+
+  // Handle trace export
+  const handleExportTrace = useCallback(async (traceId, traceName) => {
+    try {
+      const res = await authFetch(`${API_URL}/traces/${traceId}/export`);
+      if (!res.ok) {
+        showError('Failed to export trace');
+        return;
+      }
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trace-${traceId.slice(0, 8)}-${(traceName || 'export').replace(/\s+/g, '_').slice(0, 30)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      success('Trace exported successfully');
+    } catch {
+      showError('Failed to export trace');
+    }
+  }, [success, showError]);
+
+  // Handle pause/resume/step with toast feedback
+  const handlePause = useCallback(async () => {
+    await pause();
+    warning('Execution paused');
+  }, [pause, warning]);
+
+  const handleResume = useCallback(async () => {
+    await resume();
+    success('Execution resumed');
+  }, [resume, success]);
+
+  const handleStep = useCallback(async () => {
+    await step();
+    info('Stepping one step');
+  }, [step, info]);
 
   useEffect(() => {
     if (!isConnected || !selectedTrace?.trace_id) return;
@@ -139,9 +207,11 @@ function App() {
         <LandingPage onLoginClick={() => setIsAuthModalOpen(true)} />
         <AuthModal
           isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
+          onClose={handleAuthModalClose}
           onLogin={handleLogin}
+          onRegister={handleRegister}
         />
+        <ToastContainer toasts={toasts} onDismiss={removeToast} />
       </>
     );
   }
@@ -154,8 +224,9 @@ function App() {
         traces={traces}
         selectedTraceId={selectedTrace?.trace_id}
         onSelectTrace={handleSelectTrace}
-        onDeleteTrace={deleteTrace}
-        canDeleteTraces={authContext.role === 'operator' || authContext.role === 'admin'}
+        onDeleteTrace={handleDeleteTrace}
+        onExportTrace={handleExportTrace}
+        canDeleteTraces={authContext.isAuthenticated}
         loading={loading}
         isConnected={isConnected}
         errorCode={errorCode}
@@ -181,8 +252,8 @@ function App() {
             )}
           </div>
           <div className="header-right">
-            <span className="session-pill" title={`Role: ${authContext.role}`}>
-              {authContext.subject} ({authContext.role})
+            <span className="session-pill" title="Signed in">
+              {authContext.subject}
             </span>
             <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Logout</button>
             {selectedTrace && (
@@ -226,6 +297,13 @@ function App() {
                   Tokens
                 </button>
                 <button
+                  className={`tab ${activeRightTab === 'timeline' ? 'active' : ''}`}
+                  onClick={() => setActiveRightTab('timeline')}
+                >
+                  <Clock className="ui-icon ui-icon-sm" />
+                  Timeline
+                </button>
+                <button
                   className={`tab ${activeRightTab === 'state' ? 'active' : ''}`}
                   onClick={() => setActiveRightTab('state')}
                 >
@@ -242,15 +320,22 @@ function App() {
                   <Suspense fallback={<div className="panel-loading">Loading metrics...</div>}>
                     <TokenMonitor trace={selectedTrace} />
                   </Suspense>
+                ) : activeRightTab === 'timeline' ? (
+                  <Suspense fallback={<div className="panel-loading">Loading timeline...</div>}>
+                    <Timeline
+                      trace={selectedTrace}
+                      onSpanClick={setSelectedSpan}
+                    />
+                  </Suspense>
                 ) : (
                   <Suspense fallback={<div className="panel-loading">Loading inspector...</div>}>
                     <StateInspector
                       traceId={selectedTrace?.trace_id}
                       state={agentState}
                       controlStatus={controlStatus}
-                      onPause={pause}
-                      onResume={resume}
-                      onStep={step}
+                      onPause={handlePause}
+                      onResume={handleResume}
+                      onStep={handleStep}
                       onModifyState={bulkModifyState}
                     />
                   </Suspense>
@@ -325,6 +410,9 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </div>
   );
 }
