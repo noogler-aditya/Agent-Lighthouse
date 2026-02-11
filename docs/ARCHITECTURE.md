@@ -6,6 +6,7 @@
 - `backend/` (FastAPI): authenticated API + WebSocket layer over Redis storage
 - `sdk/` (Python): instrumentation client for traces, spans, and state updates
 - `redis`: persistence and real-time event backbone
+- `postgres`: persistent relational storage for user accounts and API keys
 
 ## Request and Data Flow
 
