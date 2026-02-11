@@ -179,7 +179,7 @@ jobs:
       - name: Start backend
         env:
           JWT_SECRET: ci-jwt-secret
-          MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
+          MACHINE_API_KEYS: "ci-key:trace:write|trace:read|state:write|state:read"
           ALLOWED_ORIGINS: http://localhost:5173
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
@@ -332,7 +332,7 @@ jobs:
       - name: Start backend
         env:
           JWT_SECRET: ci-jwt-secret
-          MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
+          MACHINE_API_KEYS: "ci-key:trace:write|trace:read|state:write|state:read"
           ALLOWED_ORIGINS: http://127.0.0.1:4173,http://localhost:4173
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
