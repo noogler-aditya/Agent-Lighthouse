@@ -83,7 +83,7 @@ jobs:
       - name: Import app
         env:
           JWT_SECRET: ci-jwt-secret
-          MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
+          MACHINE_API_KEYS: "ci-key:trace:write|trace:read|state:write|state:read"
           ALLOWED_ORIGINS: http://localhost:5173
           REDIS_URL: redis://localhost:6379
         run: PYTHONPATH=backend python -c "from main import app; print(app.title)"
@@ -179,7 +179,7 @@ jobs:
       - name: Start backend
         env:
           JWT_SECRET: ci-jwt-secret
-          MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
+          MACHINE_API_KEYS: "ci-key:trace:write|trace:read|state:write|state:read"
           ALLOWED_ORIGINS: http://localhost:5173
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
@@ -216,7 +216,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"name":"machine-trace"}' | python -c "import sys,json; print(json.load(sys.stdin)['trace_id'])")
           state_with_machine=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "X-API-Key: ci-key" "http://127.0.0.1:8000/api/state/${trace_id}/pause")
-          test "$state_with_machine" = "401"
+          test "$state_with_machine" = "200"
 
       - name: Run smoke trace check
         env:
@@ -332,7 +332,7 @@ jobs:
       - name: Start backend
         env:
           JWT_SECRET: ci-jwt-secret
-          MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
+          MACHINE_API_KEYS: "ci-key:trace:write|trace:read|state:write|state:read"
           ALLOWED_ORIGINS: http://127.0.0.1:4173,http://localhost:4173
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse

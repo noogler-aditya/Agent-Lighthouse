@@ -86,7 +86,12 @@ class Settings(BaseSettings):
             if scopes:
                 scoped[key.strip()] = scopes
         if not scoped and self.legacy_api_key.strip():
-            scoped[self.legacy_api_key.strip()] = {"trace:write", "trace:read"}
+            scoped[self.legacy_api_key.strip()] = {
+                "trace:write",
+                "trace:read",
+                "state:write",
+                "state:read",
+            }
         return scoped
 
     @property

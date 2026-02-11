@@ -6,6 +6,7 @@ import { useWebSocket, useTraces, useAgentState, useToast } from './hooks';
 import { Sidebar } from './components/Sidebar';
 import { LandingPage } from './components/LandingPage';
 import { AuthModal } from './components/AuthModal';
+import { OnboardingPanel } from './components/OnboardingPanel';
 import ToastContainer from './components/ToastContainer';
 import './App.css';
 
@@ -19,6 +20,9 @@ function App() {
   const [selectedSpan, setSelectedSpan] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [authContext, setAuthContext] = useState(getAuthContext());
+  const [sidebarDensity, setSidebarDensity] = useState('comfortable');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
 
   // Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -43,6 +47,9 @@ function App() {
     addSpanToTrace,
     updateSpanInTrace,
   } = useTraces(authContext.isAuthenticated);
+
+  const hasTraces = traces.length > 0;
+  const showOnboarding = authContext.isAuthenticated && !hasTraces;
 
   // Agent state
   const {
@@ -103,6 +110,9 @@ function App() {
   // Handle trace selection
   const handleSelectTrace = useCallback(async (traceId) => {
     await fetchTrace(traceId);
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      setSidebarCollapsed(true);
+    }
   }, [fetchTrace]);
 
   // Handle trace deletion with toast feedback
@@ -219,27 +229,41 @@ function App() {
   // Authenticated -> Show Dashboard
   return (
     <div className="app-container">
-      {/* Sidebar */}
-      <Sidebar
-        traces={traces}
-        selectedTraceId={selectedTrace?.trace_id}
-        onSelectTrace={handleSelectTrace}
-        onDeleteTrace={handleDeleteTrace}
-        onExportTrace={handleExportTrace}
-        canDeleteTraces={authContext.isAuthenticated}
-        loading={loading}
-        isConnected={isConnected}
-        errorCode={errorCode}
-        errorMessage={errorMessage}
-        lastFetchAt={lastFetchAt}
-        onRetry={fetchTraces}
-      />
+      <aside className={`left-rail ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <Sidebar
+          traces={traces}
+          selectedTraceId={selectedTrace?.trace_id}
+          onSelectTrace={handleSelectTrace}
+          onDeleteTrace={handleDeleteTrace}
+          onExportTrace={handleExportTrace}
+          canDeleteTraces={authContext.isAuthenticated}
+          loading={loading}
+          isConnected={isConnected}
+          errorCode={errorCode}
+          errorMessage={errorMessage}
+          lastFetchAt={lastFetchAt}
+          onRetry={fetchTraces}
+          density={sidebarDensity}
+          groupBy="date"
+          defaultFiltersOpen={false}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+          onDensityChange={setSidebarDensity}
+        />
+      </aside>
 
-      {/* Main Content */}
-      <div className="main-content" data-animate="enter">
+      <div className="main-shell" data-animate="enter">
         {/* Header */}
         <header className="main-header" data-animate="enter" data-delay="1">
           <div className="header-left">
+            <button
+              className="btn btn-secondary btn-sm sidebar-toggle"
+              onClick={() => setSidebarCollapsed((prev) => !prev)}
+              aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+              title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+            >
+              {sidebarCollapsed ? 'Show' : 'Hide'}
+            </button>
             {selectedTrace ? (
               <>
                 <h1 className="trace-title">{selectedTrace.name}</h1>
@@ -252,6 +276,13 @@ function App() {
             )}
           </div>
           <div className="header-right">
+            <button
+              className="btn btn-secondary btn-sm medium-only"
+              onClick={() => setInspectorCollapsed((prev) => !prev)}
+              aria-label="Toggle inspector panel"
+            >
+              {inspectorCollapsed ? 'Show panel' : 'Hide panel'}
+            </button>
             <span className="session-pill" title="Signed in">
               {authContext.subject}
             </span>
@@ -274,77 +305,82 @@ function App() {
 
         {/* Body */}
         <div className="main-body">
-          {/* Graph Panel */}
-          <div className="graph-panel" data-animate="enter" data-delay="1">
-            <Suspense fallback={<div className="panel-loading">Loading graph...</div>}>
-              <TraceGraph
-                trace={selectedTrace}
-                onSpanClick={setSelectedSpan}
-              />
-            </Suspense>
-          </div>
-
-          {/* Right Panel */}
-          <div className="right-panel" data-animate="enter" data-delay="2">
-            {/* Tabs */}
-            <div className="right-panel-tabs">
-              <div className="tabs">
-                <button
-                  className={`tab ${activeRightTab === 'tokens' ? 'active' : ''}`}
-                  onClick={() => setActiveRightTab('tokens')}
-                >
-                  <Coins className="ui-icon ui-icon-sm" />
-                  Tokens
-                </button>
-                <button
-                  className={`tab ${activeRightTab === 'timeline' ? 'active' : ''}`}
-                  onClick={() => setActiveRightTab('timeline')}
-                >
-                  <Clock className="ui-icon ui-icon-sm" />
-                  Timeline
-                </button>
-                <button
-                  className={`tab ${activeRightTab === 'state' ? 'active' : ''}`}
-                  onClick={() => setActiveRightTab('state')}
-                >
-                  <SearchCode className="ui-icon ui-icon-sm" />
-                  State
-                </button>
-              </div>
-            </div>
-
-            {/* Panel Content */}
-            <div className="right-panel-content">
-              <div className="panel-stage" key={activeRightTab} data-animate="enter" data-delay="1">
-                {activeRightTab === 'tokens' ? (
-                  <Suspense fallback={<div className="panel-loading">Loading metrics...</div>}>
-                    <TokenMonitor trace={selectedTrace} />
-                  </Suspense>
-                ) : activeRightTab === 'timeline' ? (
-                  <Suspense fallback={<div className="panel-loading">Loading timeline...</div>}>
-                    <Timeline
-                      trace={selectedTrace}
-                      onSpanClick={setSelectedSpan}
-                    />
-                  </Suspense>
+          <section className="workspace" data-animate="enter" data-delay="1">
+            <div className="graph-panel">
+              <Suspense fallback={<div className="panel-loading">Loading graph...</div>}>
+                {showOnboarding && !selectedTrace ? (
+                  <OnboardingPanel />
                 ) : (
-                  <Suspense fallback={<div className="panel-loading">Loading inspector...</div>}>
-                    <StateInspector
-                      traceId={selectedTrace?.trace_id}
-                      state={agentState}
-                      controlStatus={controlStatus}
-                      onPause={handlePause}
-                      onResume={handleResume}
-                      onStep={handleStep}
-                      onModifyState={bulkModifyState}
-                    />
-                  </Suspense>
+                  <TraceGraph
+                    trace={selectedTrace}
+                    onSpanClick={setSelectedSpan}
+                  />
                 )}
+              </Suspense>
+            </div>
+          </section>
+
+          <aside className={`inspector ${inspectorCollapsed ? 'collapsed' : ''}`} data-animate="enter" data-delay="2">
+            <div className="right-panel">
+              <div className="right-panel-tabs">
+                <div className="tabs">
+                  <button
+                    className={`tab ${activeRightTab === 'tokens' ? 'active' : ''}`}
+                    onClick={() => setActiveRightTab('tokens')}
+                  >
+                    <Coins className="ui-icon ui-icon-sm" />
+                    Tokens
+                  </button>
+                  <button
+                    className={`tab ${activeRightTab === 'timeline' ? 'active' : ''}`}
+                    onClick={() => setActiveRightTab('timeline')}
+                  >
+                    <Clock className="ui-icon ui-icon-sm" />
+                    Timeline
+                  </button>
+                  <button
+                    className={`tab ${activeRightTab === 'state' ? 'active' : ''}`}
+                    onClick={() => setActiveRightTab('state')}
+                  >
+                    <SearchCode className="ui-icon ui-icon-sm" />
+                    State
+                  </button>
+                </div>
+              </div>
+
+              <div className="right-panel-content">
+                <div className="panel-stage" key={activeRightTab} data-animate="enter" data-delay="1">
+                  {activeRightTab === 'tokens' ? (
+                    <Suspense fallback={<div className="panel-loading">Loading metrics...</div>}>
+                      <TokenMonitor trace={selectedTrace} />
+                    </Suspense>
+                  ) : activeRightTab === 'timeline' ? (
+                    <Suspense fallback={<div className="panel-loading">Loading timeline...</div>}>
+                      <Timeline
+                        trace={selectedTrace}
+                        onSpanClick={setSelectedSpan}
+                      />
+                    </Suspense>
+                  ) : (
+                    <Suspense fallback={<div className="panel-loading">Loading inspector...</div>}>
+                      <StateInspector
+                        traceId={selectedTrace?.trace_id}
+                        state={agentState}
+                        controlStatus={controlStatus}
+                        onPause={handlePause}
+                        onResume={handleResume}
+                        onStep={handleStep}
+                        onModifyState={bulkModifyState}
+                      />
+                    </Suspense>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
+      {sidebarCollapsed && <button className="mobile-sidebar-scrim" aria-label="Close sidebar" onClick={() => setSidebarCollapsed(false)} />}
 
       {/* Selected Span Detail (Modal) */}
       {selectedSpan && (
