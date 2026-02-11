@@ -6,6 +6,7 @@
     overflow-y: auto;
     height: 100%;
     min-height: 0;
+    width: 100%;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
 }

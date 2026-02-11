@@ -145,6 +145,7 @@ export default function TraceGraph({ trace, onSpanClick }) {
                 fitViewOptions={{ padding: 0.2 }}
                 minZoom={0.1}
                 maxZoom={2}
+                proOptions={{ hideAttribution: true }}
             >
                 <Background color="#2d2d3d" gap={20} />
                 <Controls />

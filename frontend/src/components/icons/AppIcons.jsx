@@ -189,3 +189,19 @@ export function Clock(props) {
     </IconBase>
   );
 }
+
+export function ChevronLeft(props) {
+  return (
+    <IconBase {...props}>
+      <polyline points="15 6 9 12 15 18" />
+    </IconBase>
+  );
+}
+
+export function ChevronRight(props) {
+  return (
+    <IconBase {...props}>
+      <polyline points="9 6 15 12 9 18" />
+    </IconBase>
+  );
+}
