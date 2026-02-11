@@ -1,16 +1,62 @@
-# React + Vite
+# Agent Lighthouse Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The visual dashboard for the Agent Lighthouse observability platform.
 
-Currently, two official plugins are available:
+Built with:
+- **React 18** + **Vite**
+- **React Flow** (Trace visualization)
+- **Recharts** (Token metrics)
+- **Monaco Editor** (State inspection)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Prerequisites
 
-## React Compiler
+- Node.js 18+
+- Backend running on `http://localhost:8000` (by default)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Setup
 
-## Expanding the ESLint configuration
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+2. Configure environment (optional):
+   - Copy `.env.example` to `.env`
+   - `VITE_API_URL`: Backend URL (default: `http://localhost:8000`)
+
+## Development
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:5173` to see the dashboard.
+
+## Production Build
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+## Project Structure
+
+- `src/components/TraceGraph`: React Flow graph visualization
+- `src/components/TokenMonitor`: Token usage and cost charts
+- `src/components/StateInspector`: JSON editor for agent state
+- `src/components/Sidebar`: Trace list and filtering
+
+## Key Features
+
+- **Real-time Updates**: Uses WebSockets to stream span events.
+- **Interactive Graph**: Click nodes to see details.
+- **State Control**: Pause, resume, and modify agent state on the fly.
