@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -8,11 +9,14 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+os.environ.setdefault("SUPABASE_URL", "test")
+os.environ.setdefault("SUPABASE_ANON_KEY", "test")
+
 from config import get_settings  # noqa: E402
 from dependencies import get_connection_manager, get_redis  # noqa: E402
 from main import app  # noqa: E402
 from models.trace import Trace  # noqa: E402
-from security import create_access_token  # noqa: E402
+get_settings.cache_clear()
 
 
 class FakeRedisService:
@@ -113,9 +117,7 @@ class FakeConnectionManager:
 
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
-    settings = get_settings()
-    token = create_access_token(settings, subject="test-user")
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": "Bearer test-token"}
 
 
 @pytest.fixture

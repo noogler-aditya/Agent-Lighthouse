@@ -1,3 +1,4 @@
+/* global process */
 import { expect, test } from '@playwright/test';
 
 async function registerViaApi(request, username, password) {

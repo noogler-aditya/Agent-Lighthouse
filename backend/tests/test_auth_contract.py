@@ -1,17 +1,14 @@
 from config import get_settings
-from security import create_access_token
 
 
-def _bearer(subject: str) -> dict[str, str]:
-    settings = get_settings()
-    token = create_access_token(settings, subject=subject)
-    return {"Authorization": f"Bearer {token}"}
+def _bearer() -> dict[str, str]:
+    return {"Authorization": "Bearer test-token"}
 
 
 def test_user_can_read_and_write(client_and_store):
     client, _, _ = client_and_store
 
-    headers = _bearer("test-user")
+    headers = _bearer()
     read = client.get("/api/traces", headers=headers)
     assert read.status_code == 200
 
