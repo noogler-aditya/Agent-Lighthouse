@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Clock, Coins, SearchCode } from './components/icons/AppIcons';
 import { API_URL } from './config';
 import { bootstrapSession, clearSession, getAuthContext, loginWithPassword, registerWithPassword, authFetch } from './auth/session';
@@ -16,6 +17,8 @@ const StateInspector = lazy(() => import('./components/StateInspector/StateInspe
 const Timeline = lazy(() => import('./components/Timeline/Timeline'));
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeRightTab, setActiveRightTab] = useState('tokens');
   const [selectedSpan, setSelectedSpan] = useState(null);
   const [authReady, setAuthReady] = useState(false);
@@ -26,6 +29,8 @@ function App() {
 
   // Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const shouldPromptLogin = new URLSearchParams(location.search).get('login') === '1';
 
   // Toast notifications
   const { toasts, removeToast, success, error: showError, warning, info } = useToast();
@@ -82,12 +87,19 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!authReady) return;
+    if (authContext.isAuthenticated) return;
+    if (shouldPromptLogin) setIsAuthModalOpen(true);
+  }, [authReady, authContext.isAuthenticated, shouldPromptLogin]);
+
   const handleLogin = useCallback(async (username, password) => {
     const ctx = await loginWithPassword(username, password);
     setAuthContext(ctx);
     setIsAuthModalOpen(false);
     success('Signed in successfully');
-  }, [success]);
+    navigate('/dashboard', { replace: true });
+  }, [navigate, success]);
 
   const handleRegister = useCallback(async (username, password) => {
     const result = await registerWithPassword(username, password);
@@ -97,15 +109,20 @@ function App() {
 
   const handleAuthModalClose = useCallback(() => {
     setIsAuthModalOpen(false);
-    setAuthContext(getAuthContext());
-  }, []);
+    const ctx = getAuthContext();
+    setAuthContext(ctx);
+    if (ctx.isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   const handleLogout = useCallback(() => {
     clearSession();
     setAuthContext(getAuthContext());
     setSelectedSpan(null);
     info('Signed out');
-  }, [info]);
+    navigate('/', { replace: true });
+  }, [info, navigate]);
 
   // Handle trace selection
   const handleSelectTrace = useCallback(async (traceId) => {
@@ -210,24 +227,20 @@ function App() {
     return <div className="auth-loading">Loading session...</div>;
   }
 
-  // Not Authenticated -> Show Landing Page
-  if (!authContext.isAuthenticated) {
-    return (
-      <>
-        <LandingPage onLoginClick={() => setIsAuthModalOpen(true)} />
-        <AuthModal
-          isOpen={isAuthModalOpen}
-          onClose={handleAuthModalClose}
-          onLogin={handleLogin}
-          onRegister={handleRegister}
-        />
-        <ToastContainer toasts={toasts} onDismiss={removeToast} />
-      </>
-    );
-  }
+  const landingElement = (
+    <>
+      <LandingPage onLoginClick={() => setIsAuthModalOpen(true)} />
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={handleAuthModalClose}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+      />
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
+    </>
+  );
 
-  // Authenticated -> Show Dashboard
-  return (
+  const dashboardElement = (
     <div className="app-container">
       <aside className={`left-rail ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <Sidebar
@@ -450,6 +463,35 @@ function App() {
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </div>
+  );
+
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          authContext.isAuthenticated
+            ? <Navigate to="/dashboard" replace />
+            : landingElement
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          authContext.isAuthenticated
+            ? dashboardElement
+            : <Navigate to="/?login=1" replace />
+        }
+      />
+      <Route
+        path="*"
+        element={
+          authContext.isAuthenticated
+            ? <Navigate to="/dashboard" replace />
+            : <Navigate to="/" replace />
+        }
+      />
+    </Routes>
   );
 }
 
