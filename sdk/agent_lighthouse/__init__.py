@@ -20,7 +20,7 @@ from .tracer import (
 )
 from .client import LighthouseClient
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "LighthouseTracer",
     "LighthouseClient",
@@ -29,4 +29,22 @@ __all__ = [
     "trace_agent",
     "trace_tool",
     "trace_llm",
+    "instrument",
+    "uninstrument",
+    "is_instrumented",
 ]
+
+
+def instrument() -> bool:
+    from .auto import instrument as _instrument
+    return _instrument()
+
+
+def uninstrument() -> None:
+    from .auto import uninstrument as _uninstrument
+    return _uninstrument()
+
+
+def is_instrumented() -> bool:
+    from .auto import is_instrumented as _is_instrumented
+    return _is_instrumented()
