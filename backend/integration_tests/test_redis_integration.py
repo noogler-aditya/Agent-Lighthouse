@@ -15,13 +15,14 @@ os.environ.setdefault("MACHINE_API_KEYS", "itest-key:trace:write|trace:read")
 os.environ.setdefault("RATE_LIMIT_WINDOW_SECONDS", "60")
 os.environ.setdefault("RATE_LIMIT_WRITE_PER_WINDOW", "3")
 os.environ.setdefault("RATE_LIMIT_READ_PER_WINDOW", "20")
+os.environ.setdefault("SUPABASE_URL", "test")
+os.environ.setdefault("SUPABASE_ANON_KEY", "test")
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
 from config import get_settings  # noqa: E402
 from main import app  # noqa: E402
-from security import create_access_token  # noqa: E402
 
 
 def _flush_redis():
@@ -31,9 +32,8 @@ def _flush_redis():
 
 
 def _auth_headers(subject: str) -> dict[str, str]:
-    settings = get_settings()
-    token = create_access_token(settings, subject=subject)
-    return {"Authorization": f"Bearer {token}"}
+    del subject
+    return {"Authorization": "Bearer test-token"}
 
 
 @pytest.fixture(autouse=True)

@@ -42,7 +42,7 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
                     throw new Error('Registration is unavailable');
                 }
                 const result = await onRegister(username, password);
-                setRegisteredApiKey(result?.apiKey || '');
+        setRegisteredApiKey(result?.apiKey || '');
                 setRegistrationComplete(true);
                 setCopyStatus('');
             } else {
@@ -82,7 +82,7 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
                     </h2>
                     <p>
                         {registrationComplete
-                            ? 'Copy your API key now. You will not be able to view it again.'
+                            ? (registeredApiKey ? 'Copy your API key now. You will not be able to view it again.' : 'Check your email to verify your account.')
                             : (isRegister ? 'Start monitoring your agents today' : 'Sign in to Agent Lighthouse')}
                     </p>
                 </div>
@@ -106,25 +106,31 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
 
                 {registrationComplete ? (
                     <div className="auth-success">
-                        <div className="form-group">
-                            <label>Your API Key</label>
-                            <div className="api-key-row">
-                                <input
-                                    type="text"
-                                    value={registeredApiKey || 'Unavailable'}
-                                    readOnly
-                                />
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary btn-sm"
-                                    onClick={handleCopyApiKey}
-                                    disabled={!registeredApiKey}
-                                >
-                                    Copy
-                                </button>
+                        {registeredApiKey ? (
+                            <div className="form-group">
+                                <label>Your API Key</label>
+                                <div className="api-key-row">
+                                    <input
+                                        type="text"
+                                        value={registeredApiKey || 'Unavailable'}
+                                        readOnly
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={handleCopyApiKey}
+                                        disabled={!registeredApiKey}
+                                    >
+                                        Copy
+                                    </button>
+                                </div>
+                                {copyStatus && <div className="auth-note">{copyStatus}</div>}
                             </div>
-                            {copyStatus && <div className="auth-note">{copyStatus}</div>}
-                        </div>
+                        ) : (
+                            <div className="auth-note">
+                                We have sent a verification link to your email. Please verify to continue.
+                            </div>
+                        )}
 
                         <button type="button" className="btn btn-primary btn-block" onClick={onClose}>
                             Continue
@@ -133,12 +139,12 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
                 ) : (
                     <form onSubmit={handleSubmit} className="auth-form">
                         <div className="form-group">
-                            <label>Username</label>
+                            <label>Email</label>
                             <input
                                 type="text"
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
-                                placeholder="Enter your username"
+                                placeholder="you@example.com"
                                 autoFocus
                             />
                         </div>

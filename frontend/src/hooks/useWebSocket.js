@@ -14,11 +14,11 @@ export function useWebSocket(enabled = true) {
     const connect = useCallback(async () => {
         if (!enabled || wsRef.current?.readyState === WebSocket.OPEN) return;
 
-        let token = getAccessToken();
+        let token = await getAccessToken();
         if (!token) {
             try {
                 await refreshSession();
-                token = getAccessToken();
+                token = await getAccessToken();
             } catch {
                 setIsConnected(false);
                 return;
