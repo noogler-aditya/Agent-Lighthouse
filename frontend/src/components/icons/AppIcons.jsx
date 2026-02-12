@@ -69,16 +69,7 @@ export function Wrench(props) {
   );
 }
 
-export function Radar(props) {
-  return (
-    <IconBase {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="5" />
-      <path d="m12 12 6-3" />
-      <circle cx="12" cy="12" r="1" />
-    </IconBase>
-  );
-}
+
 
 export function Coins(props) {
   return (
