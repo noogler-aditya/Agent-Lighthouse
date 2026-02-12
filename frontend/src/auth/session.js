@@ -57,3 +57,16 @@ export async function authFetch(input, init = {}) {
   if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`);
   return fetch(input, { ...init, headers });
 }
+
+export async function getAccessToken() {
+  const session = await getSession();
+  return session?.access_token || '';
+}
+
+export async function refreshSession() {
+  const { data, error } = await supabase.auth.refreshSession();
+  if (error) throw error;
+  currentSession = data.session;
+  currentUser = data.user;
+  return getAuthContext();
+}

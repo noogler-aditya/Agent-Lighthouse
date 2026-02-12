@@ -183,6 +183,8 @@ jobs:
           ALLOWED_ORIGINS: http://localhost:5173
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
+          SUPABASE_URL: test
+          SUPABASE_ANON_KEY: test
         run: |
           nohup uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
           echo $! > backend.pid
@@ -205,10 +207,7 @@ jobs:
           code_without_auth=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/traces)
           test "$code_without_auth" = "401"
 
-          viewer_token=$(curl -s http://127.0.0.1:8000/api/auth/register \
-            -H "Content-Type: application/json" \
-            -d '{"username":"ci-user","password":"ci-pass"}' | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-          code_with_bearer=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${viewer_token}" http://127.0.0.1:8000/api/traces)
+          code_with_bearer=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer test-token" http://127.0.0.1:8000/api/traces)
           test "$code_with_bearer" = "200"
 
           trace_id=$(curl -s -X POST http://127.0.0.1:8000/api/traces \
