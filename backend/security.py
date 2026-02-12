@@ -7,13 +7,11 @@ Machine API keys (X-API-Key) and user-generated API keys are both supported.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import hmac
 import logging
-import secrets
 from typing import Callable, Optional
 
-import jwt
+import httpx
 from fastapi import Depends, Header, HTTPException, Request, WebSocket, status
 
 from config import Settings, get_settings
@@ -53,62 +51,20 @@ def _parse_bearer(authorization: Optional[str]) -> str:
     return token.strip()
 
 
-def _decode_token(token: str, settings: Settings, expected_type: str = "access") -> dict:
-    try:
-        payload = jwt.decode(
-            token,
-            settings.jwt_secret,
-            algorithms=[settings.jwt_algorithm],
-            audience=settings.jwt_audience,
-            issuer=settings.jwt_issuer,
-        )
-    except jwt.PyJWTError as exc:
-        raise AuthError("Invalid or expired token") from exc
+async def _supabase_get_user(token: str, settings: Settings) -> dict:
+    if not settings.supabase_url or not settings.supabase_anon_key:
+        raise AuthError("Supabase auth not configured")
 
-    if payload.get("typ") != expected_type:
-        raise AuthError("Invalid token type")
-
-    sub = payload.get("sub")
-    if not sub:
-        raise AuthError("Token missing required claims")
-
-    return payload
-
-
-def create_access_token(settings: Settings, subject: str, user_id: Optional[str] = None) -> str:
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": subject,
-        "typ": "access",
-        "iss": settings.jwt_issuer,
-        "aud": settings.jwt_audience,
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=settings.access_token_ttl_minutes)).timestamp()),
-        "jti": secrets.token_urlsafe(12),
+    url = f"{settings.supabase_url.rstrip('/')}/auth/v1/user"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "apikey": settings.supabase_anon_key,
     }
-    if user_id:
-        payload["uid"] = user_id
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
-
-
-def create_refresh_token(settings: Settings, subject: str, user_id: Optional[str] = None) -> str:
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": subject,
-        "typ": "refresh",
-        "iss": settings.jwt_issuer,
-        "aud": settings.jwt_audience,
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=settings.refresh_token_ttl_minutes)).timestamp()),
-        "jti": secrets.token_urlsafe(16),
-    }
-    if user_id:
-        payload["uid"] = user_id
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
-
-
-def decode_refresh_token(token: str, settings: Settings) -> dict:
-    return _decode_token(token, settings, expected_type="refresh")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(url, headers=headers)
+    if resp.status_code != 200:
+        raise AuthError("Invalid or expired token")
+    return resp.json()
 
 
 async def _resolve_api_key(api_key: str, settings: Settings) -> Principal:
@@ -143,14 +99,15 @@ async def _resolve_api_key(api_key: str, settings: Settings) -> Principal:
     raise AuthError("Invalid API key")
 
 
-def _user_principal(authorization: Optional[str], settings: Settings) -> Principal:
+async def _user_principal(authorization: Optional[str], settings: Settings) -> Principal:
     token = _parse_bearer(authorization)
-    payload = _decode_token(token, settings, expected_type="access")
+    payload = await _supabase_get_user(token, settings)
+    subject = payload.get("email") or payload.get("id") or "user"
     return Principal(
-        subject=payload["sub"],
+        subject=subject,
         auth_type="user",
         scopes={"ui"},
-        user_id=payload.get("uid"),
+        user_id=payload.get("id"),
     )
 
 
@@ -162,7 +119,7 @@ async def require_user_auth(
     if not settings.require_auth:
         principal = Principal(subject="dev-user", auth_type="user", scopes={"*"})
     else:
-        principal = _user_principal(authorization, settings)
+        principal = await _user_principal(authorization, settings)
 
     request.state.principal = principal
     return principal
@@ -193,7 +150,7 @@ def require_user_or_machine(scope: str) -> Callable:
 
         if authorization:
             try:
-                principal = _user_principal(authorization, settings)
+                principal = await _user_principal(authorization, settings)
             except Exception as exc:
                 user_auth_error = exc
 
@@ -232,12 +189,12 @@ async def authenticate_websocket(
         principal = Principal(subject="dev-user", auth_type="user", scopes={"*"})
     else:
         token = _parse_ws_bearer(websocket)
-        payload = _decode_token(token, settings, expected_type="access")
+        payload = await _supabase_get_user(token, settings)
         principal = Principal(
-            subject=payload["sub"],
+            subject=payload.get("email") or payload.get("id") or "user",
             auth_type="user",
             scopes={"ui"},
-            user_id=payload.get("uid"),
+            user_id=payload.get("id"),
         )
 
     if enforce_rate_limit is not None:
@@ -250,10 +207,12 @@ async def authenticate_websocket(
 def auth_health(settings: Settings) -> dict:
     unsafe_defaults = settings.jwt_secret_uses_default
     weak_machine = any(key.startswith("dev-") for key in settings.machine_api_keys_map)
+    supabase_ready = bool(settings.supabase_url and settings.supabase_anon_key)
     return {
         "require_auth": settings.require_auth,
         "jwt_algorithm": settings.jwt_algorithm,
         "issuer": settings.jwt_issuer,
         "audience": settings.jwt_audience,
-        "unsafe_defaults": unsafe_defaults or weak_machine,
+        "unsafe_defaults": unsafe_defaults or weak_machine or not supabase_ready,
+        "supabase_configured": supabase_ready,
     }

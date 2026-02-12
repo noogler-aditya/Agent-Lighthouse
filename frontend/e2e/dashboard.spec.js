@@ -9,11 +9,13 @@ async function registerViaApi(request, username, password) {
 }
 
 async function loginViaUi(page, username, password) {
-  await page.goto('/');
-  // Click 'Sign In' on the Landing Page navigation
-  await page.getByRole('button', { name: 'Sign In' }).first().click();
+  await page.addInitScript(() => {
+    localStorage.clear();
+  });
+  await page.goto('/?login=1');
 
   // Fill form inside AuthModal
+  await expect(page.locator('.auth-modal')).toBeVisible();
   await page.getByPlaceholder('Enter your username').fill(username);
   await page.getByPlaceholder('••••••••').fill(password);
 
@@ -24,6 +26,7 @@ async function loginViaUi(page, username, password) {
 }
 
 test('dashboard loads traces, supports ws updates, and refreshes session', async ({ page, request }) => {
+  test.skip(!process.env.VITE_SUPABASE_URL, 'Supabase env not configured for e2e');
   const username = `e2e_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
   const password = 'e2e-password';
   const userSession = await registerViaApi(request, username, password);

@@ -116,8 +116,8 @@ function App() {
     }
   }, [navigate]);
 
-  const handleLogout = useCallback(() => {
-    clearSession();
+  const handleLogout = useCallback(async () => {
+    await clearSession();
     setAuthContext(getAuthContext());
     setSelectedSpan(null);
     info('Signed out');

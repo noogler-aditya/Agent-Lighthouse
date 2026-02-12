@@ -44,6 +44,8 @@ class Settings(BaseSettings):
 
     # Auth settings
     require_auth: bool = Field(default=True, alias="REQUIRE_AUTH")
+    supabase_url: str = Field(default="", alias="SUPABASE_URL")
+    supabase_anon_key: str = Field(default="", alias="SUPABASE_ANON_KEY")
     jwt_secret: str = Field(default=_DEV_SECRET, alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_issuer: str = Field(default="agent-lighthouse", alias="JWT_ISSUER")

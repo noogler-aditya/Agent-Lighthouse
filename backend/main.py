@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
 from database import init_db, close_db
-from routers import agents_router, auth_router, state_router, traces_router, websocket_router
+from routers import agents_router, state_router, traces_router, websocket_router
 from security import auth_health
 from services.connection_manager import ConnectionManager
 from services.redis_service import RedisService
@@ -32,6 +32,11 @@ def _validate_security_defaults():
         if settings.is_production:
             raise RuntimeError("JWT_SECRET must be configured in production")
         logger.warning("Using default JWT_SECRET; set a strong value before production")
+
+    if settings.require_auth and (not settings.supabase_url or not settings.supabase_anon_key):
+        if settings.is_production:
+            raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be configured in production")
+        logger.warning("Supabase auth not configured; set SUPABASE_URL and SUPABASE_ANON_KEY")
 
     if settings.require_auth and not settings.allowed_origins_list:
         raise RuntimeError("ALLOWED_ORIGINS cannot be empty when authentication is enabled")
@@ -126,7 +131,6 @@ async def request_context_middleware(request: Request, call_next):
         request_id_ctx.reset(token)
 
 
-app.include_router(auth_router)
 app.include_router(traces_router)
 app.include_router(agents_router)
 app.include_router(state_router)
