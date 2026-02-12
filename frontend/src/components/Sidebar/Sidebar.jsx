@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bot, ChevronLeft, ChevronRight, Cpu, Download, Filter, Radar, RefreshCcw, Trash2, Wrench } from '../icons/AppIcons';
+import { Bot, ChevronLeft, ChevronRight, Cpu, Download, Filter, RefreshCcw, Trash2, Wrench } from '../icons/AppIcons';
 import './Sidebar.css';
 
 const STATUS_OPTIONS = [
@@ -138,7 +138,7 @@ export default function Sidebar({
     <div className={`sidebar sidebar--${density} ${sidebarCollapsed ? 'is-collapsed' : ''}`} data-animate="enter">
       <div className="sidebar-topbar" data-animate="enter" data-delay="1">
         <div className="logo">
-          <Radar className="ui-icon logo-icon" />
+          <img src="/logo.svg" className="logo-icon" alt="Agent Lighthouse" />
           <span className="logo-text">Agent Lighthouse</span>
         </div>
         <div className="topbar-actions">

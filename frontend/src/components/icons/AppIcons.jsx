@@ -39,6 +39,20 @@ export function Cpu(props) {
   );
 }
 
+export function Radar(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <path d="M12 12l5-5" />
+      <path d="M12 3v2" />
+      <path d="M21 12h-2" />
+      <path d="M12 21v-2" />
+      <path d="M3 12h2" />
+    </IconBase>
+  );
+}
+
 export function RefreshCcw(props) {
   return (
     <IconBase {...props}>
@@ -69,16 +83,7 @@ export function Wrench(props) {
   );
 }
 
-export function Radar(props) {
-  return (
-    <IconBase {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="5" />
-      <path d="m12 12 6-3" />
-      <circle cx="12" cy="12" r="1" />
-    </IconBase>
-  );
-}
+
 
 export function Coins(props) {
   return (
