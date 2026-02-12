@@ -242,6 +242,8 @@ cd sdk
 pip install -e .
 ```
 
+The SDK is published on PyPI. Install it with the `pip install` command above.
+
 ---
 
 ## 🛠️ Usage

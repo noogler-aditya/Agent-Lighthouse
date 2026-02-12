@@ -2,6 +2,8 @@
 
 ## Current Maintainers
 
+- Name: Aditya Kumar
+- Email: adityacode2112@gmail.com
 - GitHub: `@noogler-aditya`
 - Role: Project owner and primary maintainer
 

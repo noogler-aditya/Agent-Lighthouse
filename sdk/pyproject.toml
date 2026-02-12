@@ -2,6 +2,9 @@
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = ["agent_lighthouse"]
+
 [project]
 name = "agent-lighthouse"
 version = "0.3.0"
@@ -10,7 +13,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "Agent Lighthouse Contributors", email = "maintainers@agent-lighthouse.dev"}
+    {name = "Aditya Kumar", email = "adityacode2112@gmail.com"}
 ]
 keywords = ["agents", "multi-agent", "observability", "tracing", "debugging"]
 classifiers = [

@@ -16,6 +16,8 @@ import os
 import time
 from typing import Any, Optional
 
+import importlib.metadata
+
 import httpx
 
 logger = logging.getLogger("agent_lighthouse.client")
@@ -30,8 +32,11 @@ _DEFAULT_BACKOFF_MAX = 10.0          # seconds
 _CIRCUIT_OPEN_THRESHOLD = 5          # consecutive failures before opening
 _CIRCUIT_HALF_OPEN_AFTER = 30.0      # seconds before trying again
 
-# Sentinel returned when fail_silent swallows an error
-_EMPTY: dict = {}
+def _package_version() -> str:
+    try:
+        return importlib.metadata.version("agent-lighthouse")
+    except Exception:  # noqa: BLE001
+        return "unknown"
 
 
 class LighthouseClient:
@@ -72,7 +77,9 @@ class LighthouseClient:
 
     @property
     def _default_headers(self) -> dict[str, str]:
-        headers: dict[str, str] = {"User-Agent": "agent-lighthouse-sdk/0.2.0"}
+        headers: dict[str, str] = {
+            "User-Agent": f"agent-lighthouse-sdk/{_package_version()}",
+        }
         if self.api_key:
             headers["X-API-Key"] = self.api_key
         return headers
@@ -128,7 +135,7 @@ class LighthouseClient:
         if self._is_circuit_open():
             logger.debug("Circuit breaker open — skipping %s %s", method, path)
             if self.fail_silent:
-                return fallback if fallback is not None else _EMPTY
+                return fallback if fallback is not None else {}
             raise ConnectionError("Agent Lighthouse backend unreachable (circuit open)")
 
         last_exc: Optional[Exception] = None
@@ -161,7 +168,7 @@ class LighthouseClient:
                         response.status_code, method, path,
                         response.text[:200],
                     )
-                    return fallback if fallback is not None else _EMPTY
+                    return fallback if fallback is not None else {}
                 response.raise_for_status()
 
             except httpx.TimeoutException as exc:
@@ -199,7 +206,7 @@ class LighthouseClient:
                 "All %d retries exhausted for %s %s: %s",
                 self.max_retries, method, path, last_exc,
             )
-            return fallback if fallback is not None else _EMPTY
+            return fallback if fallback is not None else {}
         raise last_exc  # type: ignore[misc]
 
     # ------------------------------------------------------------------
