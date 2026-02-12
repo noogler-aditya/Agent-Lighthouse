@@ -286,6 +286,25 @@ with tracer.trace("Research Workflow"):
     research_agent("AI Trends 2024")
 ```
 
+### Zero-Touch Auto-Instrumentation (Magic Import)
+
+No decorators required — just import once at the top of your script:
+
+```python
+import agent_lighthouse.auto
+```
+
+This will automatically instrument:
+- OpenAI and Anthropic client calls
+- `requests.post` to known LLM endpoints
+- Frameworks like LangChain/LangGraph, CrewAI, and AutoGen (when installed)
+
+Content capture is **off by default**. Enable only if you explicitly want payloads:
+
+```bash
+export LIGHTHOUSE_CAPTURE_CONTENT=true
+```
+
 ### State Inspection
 
 ```python

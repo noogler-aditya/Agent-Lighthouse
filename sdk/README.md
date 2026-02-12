@@ -83,6 +83,25 @@ def writer_agent():
     # ... execution continues ...
 ```
 
+## Zero-Touch Auto-Instrumentation (Magic Import)
+
+No code changes to your LLM calls. Just import once at the top of your script:
+
+```python
+import agent_lighthouse.auto  # auto-instruments OpenAI, Anthropic, requests, and frameworks
+```
+
+This automatically captures:
+- LLM latency
+- Token usage
+- Cost (best-effort pricing)
+
+Content capture is **off by default**. Enable if you explicitly want payloads:
+
+```bash
+export LIGHTHOUSE_CAPTURE_CONTENT=true
+```
+
 ## Configuration
 
 You can configure the SDK via environment variables:
@@ -91,3 +110,9 @@ You can configure the SDK via environment variables:
 |----------|-------------|---------|
 | `LIGHTHOUSE_API_KEY` | Your machine API key | `None` |
 | `LIGHTHOUSE_BASE_URL` | URL of the backend API | `http://localhost:8000` |
+| `LIGHTHOUSE_AUTO_INSTRUMENT` | Enable auto-instrumentation | `1` |
+| `LIGHTHOUSE_CAPTURE_CONTENT` | Capture request/response payloads | `false` |
+| `LIGHTHOUSE_LLM_HOSTS` | Allowlist extra LLM hosts for requests instrumentation | `""` |
+| `LIGHTHOUSE_PRICING_JSON` | Pricing override JSON string | `""` |
+| `LIGHTHOUSE_PRICING_PATH` | Pricing override JSON file path | `""` |
+| `LIGHTHOUSE_DISABLE_FRAMEWORKS` | Disable framework adapters (csv) | `""` |
