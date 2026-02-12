@@ -20,9 +20,9 @@ services:
     image: postgres:16-alpine
     container_name: lighthouse-postgres
     environment:
-      POSTGRES_USER: lighthouse
-      POSTGRES_PASSWORD: lighthouse
-      POSTGRES_DB: lighthouse
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -42,12 +42,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://lighthouse:lighthouse@postgres:5432/lighthouse
-      - ALLOWED_ORIGINS=http://localhost:5173
-      - JWT_SECRET=dev-secret
-      - MACHINE_API_KEYS=local-dev-key:trace:write|trace:read|state:write|state:read
-      - REQUIRE_AUTH=true
+      - REDIS_URL=${REDIS_URL}
+      - DATABASE_URL=${DATABASE_URL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - JWT_SECRET=${JWT_SECRET}
+      - MACHINE_API_KEYS=${MACHINE_API_KEYS}
+      - REQUIRE_AUTH=${REQUIRE_AUTH}
     depends_on:
       redis:
         condition: service_healthy
@@ -72,8 +72,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8000
-      - VITE_WS_URL=ws://localhost:8000/ws
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_WS_URL=${VITE_WS_URL}
     command: npm run dev -- --host --port 5173
 
 volumes:

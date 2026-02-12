@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: agent-lighthouse-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health/ready
+    pythonVersion: "3.11.14"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: BUILD_VERSION
+        value: "1.0.0"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: REQUIRE_AUTH
+        value: "true"
+      - key: MACHINE_API_KEYS
+        sync: false
