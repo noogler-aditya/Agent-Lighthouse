@@ -7,6 +7,7 @@ import { useWebSocket, useTraces, useAgentState, useToast } from './hooks';
 import { Sidebar } from './components/Sidebar';
 import { LandingPage } from './components/LandingPage';
 import { AuthModal } from './components/AuthModal';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import { OnboardingPanel } from './components/OnboardingPanel';
 import ToastContainer from './components/ToastContainer';
 import './App.css';
@@ -24,6 +25,9 @@ function App() {
   const [authReady, setAuthReady] = useState(false);
   const [authContext, setAuthContext] = useState(getAuthContext());
   const [apiKey, setApiKey] = useState('');
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [sidebarDensity, setSidebarDensity] = useState('comfortable');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
@@ -135,14 +139,37 @@ function App() {
     navigate('/', { replace: true });
   }, [info, navigate]);
 
-  const handleFetchApiKey = useCallback(async () => {
-    const key = await fetchApiKey();
-    if (key) {
-      setApiKey(key);
-      success('API key loaded');
+  const handleFetchApiKey = useCallback(async ({ silent = false } = {}) => {
+    setApiKeyLoading(true);
+    setApiKeyError('');
+    try {
+      const key = await fetchApiKey();
+      if (key) {
+        setApiKey(key);
+        if (!silent) success('API key loaded');
+      } else if (!silent) {
+        setApiKeyError('No API key returned');
+      }
+      return key;
+    } catch (err) {
+      const message = err?.message || 'Failed to fetch API key';
+      setApiKeyError(message);
+      if (!silent) showError(message);
+      return null;
+    } finally {
+      setApiKeyLoading(false);
     }
-    return key;
-  }, [success]);
+  }, [showError, success]);
+
+  useEffect(() => {
+    if (!authContext.isAuthenticated) {
+      setApiKey('');
+      setApiKeyError('');
+      setApiKeyLoading(false);
+      return;
+    }
+    handleFetchApiKey({ silent: true });
+  }, [authContext.isAuthenticated, handleFetchApiKey]);
 
   // Handle trace selection
   const handleSelectTrace = useCallback(async (traceId) => {
@@ -319,6 +346,12 @@ function App() {
             <span className="session-pill" title="Signed in">
               {authContext.subject}
             </span>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setIsApiKeyModalOpen(true)}
+            >
+              API key
+            </button>
             <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Logout</button>
             {selectedTrace && (
               <div className="header-stats">
@@ -486,32 +519,42 @@ function App() {
   );
 
   return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          authContext.isAuthenticated
-            ? <Navigate to="/dashboard" replace />
-            : landingElement
-        }
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            authContext.isAuthenticated
+              ? <Navigate to="/dashboard" replace />
+              : landingElement
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            authContext.isAuthenticated
+              ? dashboardElement
+              : <Navigate to="/?login=1" replace />
+          }
+        />
+        <Route
+          path="*"
+          element={
+            authContext.isAuthenticated
+              ? <Navigate to="/dashboard" replace />
+              : <Navigate to="/" replace />
+          }
+        />
+      </Routes>
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        apiKey={apiKey}
+        loading={apiKeyLoading}
+        error={apiKeyError}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onFetch={() => handleFetchApiKey({ silent: false })}
       />
-      <Route
-        path="/dashboard"
-        element={
-          authContext.isAuthenticated
-            ? dashboardElement
-            : <Navigate to="/?login=1" replace />
-        }
-      />
-      <Route
-        path="*"
-        element={
-          authContext.isAuthenticated
-            ? <Navigate to="/dashboard" replace />
-            : <Navigate to="/" replace />
-        }
-      />
-    </Routes>
+    </>
   );
 }
 

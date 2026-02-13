@@ -21,8 +21,22 @@ export function useWebSocket(enabled = true) {
                 token = await getAccessToken();
             } catch {
                 setIsConnected(false);
+                if (shouldReconnectRef.current) {
+                    reconnectTimeoutRef.current = setTimeout(() => {
+                        connectRef.current?.().catch(() => {});
+                    }, 3000);
+                }
                 return;
             }
+        }
+        if (!token) {
+            setIsConnected(false);
+            if (shouldReconnectRef.current) {
+                reconnectTimeoutRef.current = setTimeout(() => {
+                    connectRef.current?.().catch(() => {});
+                }, 3000);
+            }
+            return;
         }
 
         const endpoint = new URL(WS_URL, window.location.origin);
