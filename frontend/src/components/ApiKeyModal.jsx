@@ -1,13 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Hash } from './icons/AppIcons';
 
 export function ApiKeyModal({ isOpen, apiKey, loading, error, onClose, onFetch }) {
   const [copyStatus, setCopyStatus] = useState('');
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setCopyStatus('');
-  }, [isOpen]);
 
   const handleCopy = async () => {
     if (!apiKey) return;
