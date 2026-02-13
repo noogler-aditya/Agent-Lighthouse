@@ -13,6 +13,7 @@ os.environ.setdefault("SUPABASE_URL", "test")
 os.environ.setdefault("SUPABASE_ANON_KEY", "test")
 
 from config import get_settings  # noqa: E402
+import database  # noqa: E402
 from dependencies import get_connection_manager, get_redis  # noqa: E402
 from main import app  # noqa: E402
 from models.trace import Trace  # noqa: E402
@@ -115,6 +116,22 @@ class FakeConnectionManager:
         )
 
 
+class FakeDbPool:
+    def __init__(self) -> None:
+        self.api_keys: dict[str, str] = {}
+
+    async def fetchrow(self, _query: str, supabase_user_id: str):
+        api_key = self.api_keys.get(supabase_user_id)
+        if not api_key:
+            return None
+        return {"api_key": api_key}
+
+    async def execute(self, _query: str, supabase_user_id: str, api_key: str):
+        if supabase_user_id not in self.api_keys:
+            self.api_keys[supabase_user_id] = api_key
+        return "EXECUTE 1"
+
+
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
     return {"Authorization": "Bearer test-token"}
@@ -124,6 +141,7 @@ def auth_headers() -> dict[str, str]:
 def client_and_store():
     fake_redis = FakeRedisService()
     fake_manager = FakeConnectionManager()
+    fake_db_pool = FakeDbPool()
 
     @asynccontextmanager
     async def _no_op_lifespan(_app):
@@ -131,12 +149,14 @@ def client_and_store():
 
     original_lifespan = app.router.lifespan_context
     app.router.lifespan_context = _no_op_lifespan
+    original_pool = database._pool
     original_redis_service = getattr(app.state, "redis_service", None)
     original_connection_manager = getattr(app.state, "connection_manager", None)
     original_settings = getattr(app.state, "settings", None)
     app.state.redis_service = fake_redis
     app.state.connection_manager = fake_manager
     app.state.settings = get_settings()
+    database._pool = fake_db_pool
     app.dependency_overrides[get_redis] = lambda: fake_redis
     app.dependency_overrides[get_connection_manager] = lambda: fake_manager
 
@@ -145,6 +165,7 @@ def client_and_store():
 
     app.dependency_overrides.clear()
     app.router.lifespan_context = original_lifespan
+    database._pool = original_pool
     if original_redis_service is not None:
         app.state.redis_service = original_redis_service
     else:
