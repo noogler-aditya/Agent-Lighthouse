@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
 from database import init_db, close_db
-from routers import agents_router, state_router, traces_router, websocket_router
+from routers import agents_router, state_router, traces_router, websocket_router, api_keys_router
 from security import auth_health
 from services.connection_manager import ConnectionManager
 from services.redis_service import RedisService
@@ -135,6 +135,7 @@ app.include_router(traces_router)
 app.include_router(agents_router)
 app.include_router(state_router)
 app.include_router(websocket_router)
+app.include_router(api_keys_router)
 
 
 @app.get("/")

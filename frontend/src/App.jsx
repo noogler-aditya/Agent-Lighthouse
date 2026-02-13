@@ -2,7 +2,7 @@ import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Clock, Coins, SearchCode } from './components/icons/AppIcons';
 import { API_URL } from './config';
-import { bootstrapSession, clearSession, getAuthContext, loginWithPassword, registerWithPassword, authFetch } from './auth/session';
+import { bootstrapSession, clearSession, getAuthContext, loginWithPassword, registerWithPassword, authFetch, fetchApiKey } from './auth/session';
 import { useWebSocket, useTraces, useAgentState, useToast } from './hooks';
 import { Sidebar } from './components/Sidebar';
 import { LandingPage } from './components/LandingPage';
@@ -23,6 +23,7 @@ function App() {
   const [selectedSpan, setSelectedSpan] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [authContext, setAuthContext] = useState(getAuthContext());
+  const [apiKey, setApiKey] = useState('');
   const [sidebarDensity, setSidebarDensity] = useState('comfortable');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
@@ -107,6 +108,9 @@ function App() {
     if (result.isAuthenticated) {
       setAuthContext(result);
     }
+    if (result.apiKey) {
+      setApiKey(result.apiKey);
+    }
     return {
       apiKey: result.apiKey,
       requiresVerification: result.requiresVerification,
@@ -126,9 +130,19 @@ function App() {
     await clearSession();
     setAuthContext(getAuthContext());
     setSelectedSpan(null);
+    setApiKey('');
     info('Signed out');
     navigate('/', { replace: true });
   }, [info, navigate]);
+
+  const handleFetchApiKey = useCallback(async () => {
+    const key = await fetchApiKey();
+    if (key) {
+      setApiKey(key);
+      success('API key loaded');
+    }
+    return key;
+  }, [success]);
 
   // Handle trace selection
   const handleSelectTrace = useCallback(async (traceId) => {
@@ -328,7 +342,7 @@ function App() {
             <div className="graph-panel">
               <Suspense fallback={<div className="panel-loading">Loading graph...</div>}>
                 {showOnboarding && !selectedTrace ? (
-                  <OnboardingPanel />
+                  <OnboardingPanel apiKey={apiKey} onRequestApiKey={handleFetchApiKey} />
                 ) : (
                   <TraceGraph
                     trace={selectedTrace}

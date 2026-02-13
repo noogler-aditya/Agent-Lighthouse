@@ -20,11 +20,17 @@ trace.end(status="success")`,
   -d '{"name":"my-first-trace"}'`
 };
 
-export function OnboardingPanel() {
+export function OnboardingPanel({ apiKey = '', onRequestApiKey }) {
   const [activeTab, setActiveTab] = useState('python');
   const [copyStatus, setCopyStatus] = useState('');
+  const [apiKeyStatus, setApiKeyStatus] = useState('');
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
 
-  const snippet = useMemo(() => SNIPPETS[activeTab], [activeTab]);
+  const snippet = useMemo(() => {
+    const base = SNIPPETS[activeTab];
+    if (!apiKey) return base;
+    return base.replace(/lh_your_api_key/g, apiKey);
+  }, [activeTab, apiKey]);
 
   const handleCopy = async () => {
     try {
@@ -34,6 +40,25 @@ export function OnboardingPanel() {
       setCopyStatus('Copy failed');
     }
     setTimeout(() => setCopyStatus(''), 1800);
+  };
+
+  const handleApiKey = async () => {
+    if (!onRequestApiKey) return;
+    setApiKeyLoading(true);
+    setApiKeyStatus('');
+    try {
+      const key = await onRequestApiKey();
+      if (key) {
+        setApiKeyStatus('API key ready');
+      } else {
+        setApiKeyStatus('No API key returned');
+      }
+    } catch {
+      setApiKeyStatus('Failed to fetch API key');
+    } finally {
+      setApiKeyLoading(false);
+      setTimeout(() => setApiKeyStatus(''), 2400);
+    }
   };
 
   return (
@@ -49,7 +74,7 @@ export function OnboardingPanel() {
           </div>
           <h2>Connect your agent</h2>
         </div>
-        <p>Use the API key from signup to start streaming traces.</p>
+        <p>Use your API key to start streaming traces.</p>
       </div>
 
       <div className="onboarding-steps">
@@ -57,7 +82,7 @@ export function OnboardingPanel() {
           <span className="step-index">1</span>
           <div className="step-body">
             <h4>Save your API key</h4>
-            <p>You’ll only see this key once. Store it in a secure secret manager.</p>
+              <p>Generate or copy your API key to authenticate your agents.</p>
           </div>
         </div>
         <div className="onboarding-step">
@@ -97,10 +122,18 @@ export function OnboardingPanel() {
               <SearchCode className="ui-icon-sm" />
               Quick start
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={handleCopy}>
-              {copyStatus || 'Copy'}
-            </button>
+            <div className="snippet-actions">
+              {!apiKey && (
+                <button className="btn btn-secondary btn-sm" onClick={handleApiKey} disabled={apiKeyLoading}>
+                  {apiKeyLoading ? 'Fetching...' : 'Get API key'}
+                </button>
+              )}
+              <button className="btn btn-secondary btn-sm" onClick={handleCopy}>
+                {copyStatus || 'Copy'}
+              </button>
+            </div>
           </div>
+          {apiKeyStatus && <div className="snippet-status">{apiKeyStatus}</div>}
           <pre className="snippet-code">
             <code>{snippet}</code>
           </pre>
