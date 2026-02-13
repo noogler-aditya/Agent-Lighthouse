@@ -37,7 +37,11 @@ export async function registerWithPassword(email, password) {
   if (error) throw error;
   currentSession = data.session;
   currentUser = data.user;
-  return { ...getAuthContext(), apiKey: null };
+  return {
+    ...getAuthContext(),
+    apiKey: null,
+    requiresVerification: !data.session,
+  };
 }
 
 export async function clearSession() {

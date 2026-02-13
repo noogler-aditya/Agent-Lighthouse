@@ -104,7 +104,13 @@ function App() {
   const handleRegister = useCallback(async (username, password) => {
     const result = await registerWithPassword(username, password);
     success('Account created');
-    return { apiKey: result.apiKey };
+    if (result.isAuthenticated) {
+      setAuthContext(result);
+    }
+    return {
+      apiKey: result.apiKey,
+      requiresVerification: result.requiresVerification,
+    };
   }, [success]);
 
   const handleAuthModalClose = useCallback(() => {

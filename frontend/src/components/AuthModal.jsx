@@ -9,6 +9,7 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [registrationComplete, setRegistrationComplete] = useState(false);
+    const [requiresVerification, setRequiresVerification] = useState(false);
     const [registeredApiKey, setRegisteredApiKey] = useState('');
     const [copyStatus, setCopyStatus] = useState('');
 
@@ -21,6 +22,7 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
         setError('');
         setLoading(false);
         setRegistrationComplete(false);
+        setRequiresVerification(false);
         setRegisteredApiKey('');
         setCopyStatus('');
     }, [isOpen]);
@@ -42,7 +44,8 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
                     throw new Error('Registration is unavailable');
                 }
                 const result = await onRegister(username, password);
-        setRegisteredApiKey(result?.apiKey || '');
+                setRegisteredApiKey(result?.apiKey || '');
+                setRequiresVerification(Boolean(result?.requiresVerification));
                 setRegistrationComplete(true);
                 setCopyStatus('');
             } else {
@@ -82,7 +85,11 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
                     </h2>
                     <p>
                         {registrationComplete
-                            ? (registeredApiKey ? 'Copy your API key now. You will not be able to view it again.' : 'Check your email to verify your account.')
+                            ? (registeredApiKey
+                                ? 'Copy your API key now. You will not be able to view it again.'
+                                : (requiresVerification
+                                  ? 'Check your email to verify your account.'
+                                  : 'Your account is ready. You can continue to the dashboard.'))
                             : (isRegister ? 'Start monitoring your agents today' : 'Sign in to Agent Lighthouse')}
                     </p>
                 </div>
@@ -128,7 +135,9 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
                             </div>
                         ) : (
                             <div className="auth-note">
-                                We have sent a verification link to your email. Please verify to continue.
+                                {requiresVerification
+                                  ? 'We have sent a verification link to your email. Please verify to continue.'
+                                  : 'Your account is active. You can continue to the dashboard.'}
                             </div>
                         )}
 
