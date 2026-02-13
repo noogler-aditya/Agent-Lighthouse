@@ -137,7 +137,9 @@ export function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
                             <div className="auth-note">
                                 {requiresVerification
                                   ? 'We have sent a verification link to your email. Please verify to continue.'
-                                  : 'Your account is active. You can continue to the dashboard.'}
+                                  : (registeredApiKey
+                                    ? 'Your account is active. You can continue to the dashboard.'
+                                    : 'Your account is active. Fetch your API key from the dashboard.')}
                             </div>
                         )}
 

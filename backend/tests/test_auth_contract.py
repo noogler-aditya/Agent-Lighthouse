@@ -15,6 +15,11 @@ def test_user_can_read_and_write(client_and_store):
     write = client.post("/api/traces", headers=headers, json={"name": "allowed"})
     assert write.status_code == 200
 
+    api_key_response = client.get("/api/auth/api-key", headers=headers)
+    assert api_key_response.status_code == 200
+    payload = api_key_response.json()
+    assert payload["api_key"].startswith("lh_")
+
 
 def test_machine_key_scope_allows_trace_ingestion_only(client_and_store):
     client, _, _ = client_and_store

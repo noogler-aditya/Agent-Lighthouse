@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { API_URL } from '../config';
 
 let currentSession = null;
 let currentUser = null;
@@ -37,9 +38,13 @@ export async function registerWithPassword(email, password) {
   if (error) throw error;
   currentSession = data.session;
   currentUser = data.user;
+  let apiKey = null;
+  if (data.session) {
+    apiKey = await fetchApiKey().catch(() => null);
+  }
   return {
     ...getAuthContext(),
-    apiKey: null,
+    apiKey,
     requiresVerification: !data.session,
   };
 }
@@ -60,6 +65,16 @@ export async function authFetch(input, init = {}) {
   const headers = new Headers(init.headers || {});
   if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`);
   return fetch(input, { ...init, headers });
+}
+
+export async function fetchApiKey() {
+  const res = await authFetch(`${API_URL}/auth/api-key`);
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}));
+    throw new Error(payload.detail || 'Failed to fetch API key');
+  }
+  const data = await res.json();
+  return data.api_key || null;
 }
 
 export async function getAccessToken() {

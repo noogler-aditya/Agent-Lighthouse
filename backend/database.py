@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    supabase_user_id TEXT PRIMARY KEY,
+    api_key         VARCHAR(64) UNIQUE NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
 """
 
 
