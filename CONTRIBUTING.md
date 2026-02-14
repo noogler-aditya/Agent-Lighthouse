@@ -22,15 +22,18 @@ docker-compose up --build
 # Backend
 cd backend
 pip install -r requirements.txt
-export JWT_SECRET=dev-secret
+export SUPABASE_URL=http://localhost:54321
+export SUPABASE_JWT_ISSUER=http://localhost:54321/auth/v1
+export SUPABASE_JWT_AUDIENCE=authenticated
 export MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
 export ALLOWED_ORIGINS=http://localhost:5173
-export DATABASE_URL=postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
 python3 -m uvicorn main:app --reload --port 8000
 
 # Frontend (new terminal)
 cd frontend
 npm install
+export VITE_SUPABASE_URL=http://localhost:54321
+export VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 npm run dev
 
 # SDK smoke check

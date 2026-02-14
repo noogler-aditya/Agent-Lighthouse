@@ -16,3 +16,6 @@ function toWebSocketUrl(httpUrl) {
 export const API_BASE_URL = rawApiUrl;
 export const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 export const WS_URL = wsOverride || toWebSocketUrl(rawApiUrl);
+
+export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';

@@ -8,12 +8,13 @@ Use this sequence to determine whether it is truly empty data or a hidden error.
    - `curl http://localhost:8000/health/live`
    - `curl http://localhost:8000/health/ready`
 2. Verify traces endpoint:
-   - `TOKEN=$(curl -s http://localhost:8000/api/auth/register -H "Content-Type: application/json" -d '{"username":"demo","password":"demo"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")`
+   - `TOKEN=<supabase_access_token>`
    - `curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/traces`
 3. Verify frontend env:
    - `VITE_API_URL` points to backend
+   - `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set correctly
 4. Verify backend env:
-   - `JWT_SECRET` and `DATABASE_URL` are set
+   - `SUPABASE_URL`, `SUPABASE_JWT_ISSUER`, and `SUPABASE_JWT_AUDIENCE` are set
    - `MACHINE_API_KEYS` includes SDK scope if SDK ingestion is used
    - `ALLOWED_ORIGINS` includes `http://localhost:5173`
 

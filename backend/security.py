@@ -1,30 +1,38 @@
 """
 Authentication and authorization helpers for HTTP and WebSocket access.
-
-Simplified: no role hierarchy. All authenticated users have equal access.
-Machine API keys (X-API-Key) and user-generated API keys are both supported.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import hmac
 import logging
+from functools import lru_cache
 from typing import Callable, Optional
+import secrets
 
-import httpx
+import jwt
+from jwt import PyJWKClient
 from fastapi import Depends, Header, HTTPException, Request, WebSocket, status
 
 from config import Settings, get_settings
+from services.api_key_service import get_user_principal_by_api_key
 
 logger = logging.getLogger(__name__)
+
+ROLE_ORDER = {
+    "viewer": 10,
+    "operator": 20,
+    "admin": 30,
+}
 
 
 @dataclass
 class Principal:
     subject: str
-    auth_type: str  # "user", "machine", or "api_key"
+    role: str
+    auth_type: str
     scopes: set[str]
-    user_id: Optional[str] = None
 
 
 class AuthError(HTTPException):
@@ -41,6 +49,20 @@ def _normalize(value: Optional[str]) -> Optional[str]:
     return normalized or None
 
 
+def _assert_role(value: str) -> str:
+    role = value.strip().lower()
+    if role not in ROLE_ORDER:
+        raise AuthError(f"Unsupported role: {value}", status.HTTP_403_FORBIDDEN)
+    return role
+
+
+def _ensure_role(principal: Principal, minimum_role: str):
+    required = _assert_role(minimum_role)
+    principal_role = _assert_role(principal.role)
+    if ROLE_ORDER[principal_role] < ROLE_ORDER[required]:
+        raise AuthError("Insufficient role", status.HTTP_403_FORBIDDEN)
+
+
 def _parse_bearer(authorization: Optional[str]) -> str:
     value = _normalize(authorization)
     if not value:
@@ -51,67 +73,152 @@ def _parse_bearer(authorization: Optional[str]) -> str:
     return token.strip()
 
 
-async def _supabase_get_user(token: str, settings: Settings) -> dict:
-    if not settings.supabase_url or not settings.supabase_anon_key:
-        raise AuthError("Supabase auth not configured")
+@lru_cache(maxsize=4)
+def _get_jwks_client(jwks_url: str) -> PyJWKClient:
+    return PyJWKClient(jwks_url)
 
-    if settings.supabase_url == "test" and settings.supabase_anon_key == "test":
-        return {"id": "test-user", "email": "test-user@example.com"}
 
-    url = f"{settings.supabase_url.rstrip('/')}/auth/v1/user"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "apikey": settings.supabase_anon_key,
+def _extract_claim(payload: dict, path: str):
+    current = payload
+    for part in path.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def _decode_supabase_access_token(token: str, settings: Settings) -> dict:
+    if not settings.supabase_configured:
+        raise AuthError("Supabase auth is not configured", status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    try:
+        signing_key = _get_jwks_client(settings.supabase_jwks_url).get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=settings.supabase_jwt_audience,
+            issuer=settings.supabase_effective_issuer,
+            options={"require": ["sub", "exp", "iat"]},
+        )
+    except Exception as exc:  # noqa: BLE001
+        if settings.app_env.lower() == "test" and settings.supabase_test_jwt_secret:
+            try:
+                return jwt.decode(
+                    token,
+                    settings.supabase_test_jwt_secret,
+                    algorithms=["HS256"],
+                    audience=settings.supabase_jwt_audience,
+                    issuer=settings.supabase_effective_issuer or "http://localhost:54321/auth/v1",
+                )
+            except Exception as test_exc:  # noqa: BLE001
+                raise AuthError("Invalid or expired token") from test_exc
+        raise AuthError("Invalid or expired token") from exc
+
+    return payload
+
+
+def _resolve_supabase_role(payload: dict, settings: Settings) -> str:
+    mapped_role = None
+
+    candidates = [
+        _extract_claim(payload, settings.supabase_role_claim),
+        payload.get("role"),
+        _extract_claim(payload, "app_metadata.role"),
+    ]
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        raw = candidate.strip()
+        if not raw:
+            continue
+        mapped_role = settings.supabase_role_map_dict.get(raw, raw)
+        break
+
+    if not mapped_role:
+        mapped_role = "viewer"
+
+    return _assert_role(mapped_role)
+
+
+def create_access_token(settings: Settings, subject: str, role: str) -> str:
+    """
+    Test helper for integration/unit tests in APP_ENV=test.
+    Production auth path always verifies Supabase-issued tokens.
+    """
+    if settings.app_env.lower() != "test" or not settings.supabase_test_jwt_secret:
+        raise RuntimeError("create_access_token is only available for test environment")
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": subject,
+        "role": role,
+        "aud": settings.supabase_jwt_audience,
+        "iss": settings.supabase_effective_issuer or "http://localhost:54321/auth/v1",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=30)).timestamp()),
+        "app_metadata": {"role": role},
+        "typ": "access",
+        "jti": secrets.token_urlsafe(10),
     }
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(url, headers=headers)
-    if resp.status_code != 200:
-        raise AuthError("Invalid or expired token")
-    return resp.json()
+    return jwt.encode(payload, settings.supabase_test_jwt_secret, algorithm="HS256")
 
 
-async def _resolve_api_key(api_key: str, settings: Settings) -> Principal:
-    """
-    Resolve an API key to a Principal.
-    Checks user-generated keys (PostgreSQL) first, then machine keys (env var).
-    """
+def _machine_principal(api_key: str, settings: Settings, required_scope: Optional[str]) -> Principal:
+    key = _normalize(api_key)
+    if not key:
+        raise AuthError("Missing machine API key")
+
+    for known_key, scopes in settings.machine_api_keys_map.items():
+        if hmac.compare_digest(key, known_key):
+            if required_scope and required_scope not in scopes:
+                raise AuthError("Machine API key missing required scope", status.HTTP_403_FORBIDDEN)
+            return Principal(subject="machine", role="operator", auth_type="machine", scopes=scopes)
+
+    raise AuthError("Invalid machine API key")
+
+
+def _user_principal(authorization: Optional[str], settings: Settings) -> Principal:
+    token = _parse_bearer(authorization)
+    payload = _decode_supabase_access_token(token, settings)
+    role = _resolve_supabase_role(payload, settings)
+    subject = payload.get("sub")
+    if not subject:
+        raise AuthError("Token missing required claims")
+    return Principal(subject=subject, role=role, auth_type="user", scopes={"ui"})
+
+
+async def _resolve_api_key(
+    request: Request,
+    api_key: str,
+    settings: Settings,
+    required_scope: Optional[str],
+    minimum_role: str,
+) -> Principal:
     key = _normalize(api_key)
     if not key:
         raise AuthError("Missing API key")
 
-    # 1. Check user-generated API keys (from PostgreSQL)
-    if key.startswith("lh_"):
-        try:
-            from services.user_service import get_user_by_api_key
-            user = await get_user_by_api_key(key)
-            if user:
-                return Principal(
-                    subject=user["username"],
-                    auth_type="api_key",
-                    scopes={"trace:write", "trace:read"},
-                    user_id=user["id"],
-                )
-        except Exception as db_exc:
-            logger.debug("User API key lookup failed, falling through to machine keys: %s", db_exc)
+    redis_service = getattr(request.app.state, "redis_service", None)
+    if redis_service is None:
+        return _machine_principal(key, settings, required_scope)
 
-    # 2. Check machine API keys (env var — backward compatible)
-    for known_key, scopes in settings.machine_api_keys_map.items():
-        if hmac.compare_digest(key, known_key):
-            return Principal(subject="machine", auth_type="machine", scopes=scopes)
+    try:
+        principal_data = await get_user_principal_by_api_key(redis_service, key)
+    except Exception:  # noqa: BLE001
+        logger.warning("API key lookup failed; falling back to machine keys", exc_info=True)
+        principal_data = None
 
-    raise AuthError("Invalid API key")
+    if principal_data:
+        subject, role = principal_data
+        resolved_role = _assert_role(role)
+        scopes = {"trace:read"} if resolved_role == "viewer" else {"trace:read", "trace:write"}
+        if required_scope and required_scope not in scopes:
+            raise AuthError("API key missing required scope", status.HTTP_403_FORBIDDEN)
+        principal = Principal(subject=subject, role=resolved_role, auth_type="api_key", scopes=scopes)
+        _ensure_role(principal, minimum_role)
+        return principal
 
-
-async def _user_principal(authorization: Optional[str], settings: Settings) -> Principal:
-    token = _parse_bearer(authorization)
-    payload = await _supabase_get_user(token, settings)
-    subject = payload.get("email") or payload.get("id") or "user"
-    return Principal(
-        subject=subject,
-        auth_type="user",
-        scopes={"ui"},
-        user_id=payload.get("id"),
-    )
+    return _machine_principal(key, settings, required_scope)
 
 
 async def require_user_auth(
@@ -120,23 +227,49 @@ async def require_user_auth(
 ) -> Principal:
     settings = get_settings()
     if not settings.require_auth:
-        principal = Principal(subject="dev-user", auth_type="user", scopes={"*"})
+        principal = Principal(subject="dev-user", role="admin", auth_type="user", scopes={"*"})
     else:
-        principal = await _user_principal(authorization, settings)
+        principal = _user_principal(authorization, settings)
 
     request.state.principal = principal
     return principal
 
 
-def require_auth() -> Callable:
-    """Require any authenticated user (no role check)."""
+async def require_machine_key(
+    request: Request,
+    required_scope: Optional[str] = None,
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+) -> Principal:
+    settings = get_settings()
+    principal = _machine_principal(x_api_key, settings, required_scope)
+    request.state.principal = principal
+    return principal
+
+
+def require_role(minimum_role: str) -> Callable:
     async def _dependency(principal: Principal = Depends(require_user_auth)) -> Principal:
+        _ensure_role(principal, minimum_role)
         return principal
+
     return _dependency
 
 
-def require_user_or_machine(scope: str) -> Callable:
-    """Allow either a user (Bearer token) or machine (X-API-Key) with the given scope."""
+def require_auth(minimum_role: str = "viewer") -> Callable:
+    return require_role(minimum_role)
+
+
+def require_user_or_machine(minimum_role: str, scope: Optional[str] = None) -> Callable:
+    # Backward-compatible form: require_user_or_machine("trace:read")
+    if scope is None:
+        resolved_scope = minimum_role
+        if resolved_scope.endswith(":write"):
+            resolved_minimum_role = "operator"
+        else:
+            resolved_minimum_role = "viewer"
+    else:
+        resolved_scope = scope
+        resolved_minimum_role = minimum_role
+
     async def _dependency(
         request: Request,
         authorization: Optional[str] = Header(default=None, alias="Authorization"),
@@ -144,7 +277,7 @@ def require_user_or_machine(scope: str) -> Callable:
     ) -> Principal:
         settings = get_settings()
         if not settings.require_auth:
-            principal = Principal(subject="dev-user", auth_type="user", scopes={"*"})
+            principal = Principal(subject="dev-user", role="admin", auth_type="user", scopes={"*"})
             request.state.principal = principal
             return principal
 
@@ -153,19 +286,19 @@ def require_user_or_machine(scope: str) -> Callable:
 
         if authorization:
             try:
-                principal = await _user_principal(authorization, settings)
-            except Exception as exc:
+                candidate = _user_principal(authorization, settings)
+                _ensure_role(candidate, resolved_minimum_role)
+                principal = candidate
+            except Exception as exc:  # noqa: BLE001
                 user_auth_error = exc
 
         if principal is None and x_api_key:
-            principal = await _resolve_api_key(x_api_key, settings)
+            principal = await _resolve_api_key(
+                request, x_api_key, settings, resolved_scope, resolved_minimum_role
+            )
 
         if principal is None:
             raise user_auth_error if isinstance(user_auth_error, HTTPException) else AuthError("Unauthorized")
-
-        if principal.auth_type in {"machine", "api_key"}:
-            if "*" not in principal.scopes and scope not in principal.scopes:
-                raise AuthError("Forbidden", status_code=status.HTTP_403_FORBIDDEN)
 
         request.state.principal = principal
         return principal
@@ -185,20 +318,21 @@ def _parse_ws_bearer(websocket: WebSocket) -> str:
 
 async def authenticate_websocket(
     websocket: WebSocket,
+    minimum_role: str = "viewer",
     enforce_rate_limit: Optional[Callable[[str], None]] = None,
 ) -> Principal:
     settings = get_settings()
     if not settings.require_auth:
-        principal = Principal(subject="dev-user", auth_type="user", scopes={"*"})
+        principal = Principal(subject="dev-user", role="admin", auth_type="user", scopes={"*"})
     else:
         token = _parse_ws_bearer(websocket)
-        payload = await _supabase_get_user(token, settings)
-        principal = Principal(
-            subject=payload.get("email") or payload.get("id") or "user",
-            auth_type="user",
-            scopes={"ui"},
-            user_id=payload.get("id"),
-        )
+        payload = _decode_supabase_access_token(token, settings)
+        role = _resolve_supabase_role(payload, settings)
+        subject = payload.get("sub")
+        if not subject:
+            raise AuthError("Token missing required claims")
+        principal = Principal(subject=subject, role=role, auth_type="user", scopes={"ui"})
+        _ensure_role(principal, minimum_role)
 
     if enforce_rate_limit is not None:
         enforce_rate_limit(principal.subject)
@@ -208,14 +342,10 @@ async def authenticate_websocket(
 
 
 def auth_health(settings: Settings) -> dict:
-    unsafe_defaults = settings.jwt_secret_uses_default
-    weak_machine = any(key.startswith("dev-") for key in settings.machine_api_keys_map)
-    supabase_ready = bool(settings.supabase_url and settings.supabase_anon_key)
     return {
         "require_auth": settings.require_auth,
-        "jwt_algorithm": settings.jwt_algorithm,
-        "issuer": settings.jwt_issuer,
-        "audience": settings.jwt_audience,
-        "unsafe_defaults": unsafe_defaults or weak_machine or (settings.is_production and not supabase_ready),
-        "supabase_configured": supabase_ready,
+        "provider": "supabase",
+        "issuer": settings.supabase_effective_issuer,
+        "audience": settings.supabase_jwt_audience,
+        "unsafe_defaults": not settings.supabase_configured,
     }

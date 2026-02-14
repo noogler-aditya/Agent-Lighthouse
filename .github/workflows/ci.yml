@@ -25,10 +25,10 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
@@ -54,10 +54,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
@@ -82,8 +82,12 @@ jobs:
 
       - name: Import app
         env:
-          JWT_SECRET: ci-jwt-secret
-          MACHINE_API_KEYS: "ci-key:trace:write|trace:read|state:write|state:read"
+          APP_ENV: test
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_JWT_ISSUER: http://localhost:54321/auth/v1
+          SUPABASE_JWT_AUDIENCE: authenticated
+          SUPABASE_TEST_JWT_SECRET: ci-jwt-secret
+          MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
           ALLOWED_ORIGINS: http://localhost:5173
           REDIS_URL: redis://localhost:6379
         run: PYTHONPATH=backend python -c "from main import app; print(app.title)"
@@ -97,10 +101,10 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
@@ -145,25 +149,12 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
-      postgres:
-        image: postgres:16-alpine
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: lighthouse
-          POSTGRES_PASSWORD: lighthouse
-          POSTGRES_DB: lighthouse
-        options: >-
-          --health-cmd "pg_isready -U lighthouse"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
@@ -178,13 +169,14 @@ jobs:
 
       - name: Start backend
         env:
-          JWT_SECRET: ci-jwt-secret
-          MACHINE_API_KEYS: "ci-key:trace:write|trace:read|state:write|state:read"
+          APP_ENV: test
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_JWT_ISSUER: http://localhost:54321/auth/v1
+          SUPABASE_JWT_AUDIENCE: authenticated
+          SUPABASE_TEST_JWT_SECRET: ci-jwt-secret
+          MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
           ALLOWED_ORIGINS: http://localhost:5173
           REDIS_URL: redis://localhost:6379
-          DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
-          SUPABASE_URL: test
-          SUPABASE_ANON_KEY: test
         run: |
           nohup uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
           echo $! > backend.pid
@@ -202,12 +194,25 @@ jobs:
           exit 1
 
       - name: Verify auth behavior
+        env:
+          APP_ENV: test
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_JWT_ISSUER: http://localhost:54321/auth/v1
+          SUPABASE_JWT_AUDIENCE: authenticated
+          SUPABASE_TEST_JWT_SECRET: ci-jwt-secret
         run: |
           set -e
           code_without_auth=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/traces)
           test "$code_without_auth" = "401"
 
-          code_with_bearer=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer test-token" http://127.0.0.1:8000/api/traces)
+          viewer_token=$(PYTHONPATH=backend python - <<'PY'
+          from config import get_settings
+          from security import create_access_token
+          s = get_settings()
+          print(create_access_token(s, subject="ci-viewer", role="viewer"))
+          PY
+          )
+          code_with_bearer=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${viewer_token}" http://127.0.0.1:8000/api/traces)
           test "$code_with_bearer" = "200"
 
           trace_id=$(curl -s -X POST http://127.0.0.1:8000/api/traces \
@@ -215,7 +220,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"name":"machine-trace"}' | python -c "import sys,json; print(json.load(sys.stdin)['trace_id'])")
           state_with_machine=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "X-API-Key: ci-key" "http://127.0.0.1:8000/api/state/${trace_id}/pause")
-          test "$state_with_machine" = "200"
+          test "$state_with_machine" = "403"
 
       - name: Run smoke trace check
         env:
@@ -251,22 +256,9 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
-      postgres:
-        image: postgres:16-alpine
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: lighthouse
-          POSTGRES_PASSWORD: lighthouse
-          POSTGRES_DB: lighthouse
-        options: >-
-          --health-cmd "pg_isready -U lighthouse"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -282,15 +274,25 @@ jobs:
 
       - name: Run backend integration tests
         env:
+          APP_ENV: test
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_JWT_ISSUER: http://localhost:54321/auth/v1
+          SUPABASE_JWT_AUDIENCE: authenticated
+          SUPABASE_TEST_JWT_SECRET: ci-jwt-secret
           REDIS_URL: redis://localhost:6379
-          DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
-          JWT_SECRET: ci-jwt-secret
           ALLOWED_ORIGINS: http://localhost:5173
         run: pytest -q backend/integration_tests
 
   frontend-e2e:
     name: Frontend E2E (Playwright)
     runs-on: ubuntu-latest
+    env:
+      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      E2E_OPERATOR_EMAIL: ${{ secrets.E2E_OPERATOR_EMAIL }}
+      E2E_OPERATOR_PASSWORD: ${{ secrets.E2E_OPERATOR_PASSWORD }}
+      E2E_VIEWER_EMAIL: ${{ secrets.E2E_VIEWER_EMAIL }}
+      E2E_VIEWER_PASSWORD: ${{ secrets.E2E_VIEWER_PASSWORD }}
     services:
       redis:
         image: redis:7-alpine
@@ -301,22 +303,9 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
-      postgres:
-        image: postgres:16-alpine
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: lighthouse
-          POSTGRES_PASSWORD: lighthouse
-          POSTGRES_DB: lighthouse
-        options: >-
-          --health-cmd "pg_isready -U lighthouse"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -330,11 +319,14 @@ jobs:
 
       - name: Start backend
         env:
-          JWT_SECRET: ci-jwt-secret
-          MACHINE_API_KEYS: "ci-key:trace:write|trace:read|state:write|state:read"
+          APP_ENV: test
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_JWT_ISSUER: http://localhost:54321/auth/v1
+          SUPABASE_JWT_AUDIENCE: authenticated
+          SUPABASE_TEST_JWT_SECRET: ci-jwt-secret
+          MACHINE_API_KEYS: "ci-key:trace:write|trace:read"
           ALLOWED_ORIGINS: http://127.0.0.1:4173,http://localhost:4173
           REDIS_URL: redis://localhost:6379
-          DATABASE_URL: postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
         run: |
           nohup uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000 > backend-e2e.log 2>&1 &
           echo $! > backend-e2e.pid
@@ -365,7 +357,12 @@ jobs:
         run: npx --prefix frontend playwright install --with-deps chromium
 
       - name: Run frontend e2e
+        if: ${{ env.E2E_SUPABASE_ANON_KEY != '' }}
         run: npm run e2e --prefix frontend
+
+      - name: Skip frontend e2e (missing secrets)
+        if: ${{ env.E2E_SUPABASE_ANON_KEY == '' }}
+        run: echo "Skipping frontend e2e because Supabase E2E secrets are not configured."
 
       - name: Stop backend
         if: always()
@@ -403,7 +400,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Comment and label failed PR
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.payload.pull_request?.number;

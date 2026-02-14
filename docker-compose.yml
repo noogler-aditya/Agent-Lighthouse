@@ -1,3 +1,4 @@
+version: '3.8'
 
 services:
   # Redis for state persistence
@@ -6,29 +7,9 @@ services:
     container_name: lighthouse-redis
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  # PostgreSQL for user auth
-  postgres:
-    image: postgres:16-alpine
-    container_name: lighthouse-postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lighthouse"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -42,16 +23,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - REDIS_URL=${REDIS_URL}
-      - DATABASE_URL=${DATABASE_URL}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-      - JWT_SECRET=${JWT_SECRET}
-      - MACHINE_API_KEYS=${MACHINE_API_KEYS}
-      - REQUIRE_AUTH=${REQUIRE_AUTH}
+      - REDIS_URL=redis://redis:6379
+      - ALLOWED_ORIGINS=http://localhost:5173
+      - SUPABASE_URL=http://host.docker.internal:54321
+      - SUPABASE_JWT_ISSUER=http://host.docker.internal:54321/auth/v1
+      - SUPABASE_JWT_AUDIENCE=authenticated
+      - SUPABASE_ROLE_CLAIM=app_metadata.role
+      - SUPABASE_ROLE_MAP=authenticated:viewer,service_role:admin
+      - MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
+      - REQUIRE_AUTH=true
     depends_on:
       redis:
-        condition: service_healthy
-      postgres:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -72,10 +54,11 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=${VITE_API_URL}
-      - VITE_WS_URL=${VITE_WS_URL}
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000/ws
+      - VITE_SUPABASE_URL=http://localhost:54321
+      - VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
     command: npm run dev -- --host --port 5173
 
 volumes:
   redis_data:
-  pg_data:

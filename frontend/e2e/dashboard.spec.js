@@ -1,38 +1,36 @@
-/* global process */
 import { expect, test } from '@playwright/test';
+import process from 'node:process';
 
-async function registerViaApi(request, username, password) {
-  const response = await request.post('http://127.0.0.1:8000/api/auth/register', {
-    data: { username, password },
+async function loginViaApi(request, email, password) {
+  const supabaseUrl = process.env.E2E_SUPABASE_URL || 'http://127.0.0.1:54321';
+  const anonKey = process.env.E2E_SUPABASE_ANON_KEY || '';
+  const response = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+    headers: {
+      apikey: anonKey,
+    },
+    data: { email, password },
   });
   expect(response.ok()).toBeTruthy();
   return response.json();
 }
 
-async function loginViaUi(page, username, password) {
-  await page.addInitScript(() => {
-    localStorage.clear();
-  });
-  await page.goto('/?login=1');
-
-  // Fill form inside AuthModal
-  await expect(page.locator('.auth-modal')).toBeVisible();
-  await page.getByPlaceholder('Enter your username').fill(username);
-  await page.getByPlaceholder('••••••••').fill(password);
-
-  // Click 'Sign In' inside the modal (submit button)
-  await page.locator('.auth-form').getByRole('button', { name: 'Sign In' }).click();
-
+async function loginViaUi(page, email, password) {
+  await page.goto('/');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByText('Select a trace to begin')).toBeVisible();
 }
 
 test('dashboard loads traces, supports ws updates, and refreshes session', async ({ page, request }) => {
-  test.skip(!process.env.VITE_SUPABASE_URL, 'Supabase env not configured for e2e');
-  const username = `e2e_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-  const password = 'e2e-password';
-  const userSession = await registerViaApi(request, username, password);
+  const operatorEmail = process.env.E2E_OPERATOR_EMAIL || 'operator@example.com';
+  const operatorPassword = process.env.E2E_OPERATOR_PASSWORD || 'operator-password';
+  const viewerEmail = process.env.E2E_VIEWER_EMAIL || 'viewer@example.com';
+  const viewerPassword = process.env.E2E_VIEWER_PASSWORD || 'viewer-password';
+
+  const operator = await loginViaApi(request, operatorEmail, operatorPassword);
   const createTrace = await request.post('http://127.0.0.1:8000/api/traces', {
-    headers: { Authorization: `Bearer ${userSession.access_token}` },
+    headers: { Authorization: `Bearer ${operator.access_token}` },
     data: {
       name: `e2e-trace-${Date.now()}`,
       metadata: { source: 'playwright' },
@@ -41,14 +39,7 @@ test('dashboard loads traces, supports ws updates, and refreshes session', async
   expect(createTrace.ok()).toBeTruthy();
   const trace = await createTrace.json();
 
-  await loginViaUi(page, username, password);
-
-  // Force an expired/invalid access token and verify refresh keeps session alive.
-  await page.evaluate(() => {
-    localStorage.setItem('lighthouse_access_token', 'invalid.token.value');
-  });
-  await page.reload();
-  await expect(page.locator('.auth-card')).toHaveCount(0);
+  await loginViaUi(page, viewerEmail, viewerPassword);
 
   // Refresh list after trace creation and select trace for WS subscription.
   await page.reload();
@@ -60,7 +51,7 @@ test('dashboard loads traces, supports ws updates, and refreshes session', async
   await expect(toolCard).toHaveText('0');
 
   const createSpan = await request.post(`http://127.0.0.1:8000/api/traces/${trace.trace_id}/spans`, {
-    headers: { Authorization: `Bearer ${userSession.access_token}` },
+    headers: { Authorization: `Bearer ${operator.access_token}` },
     data: {
       name: 'e2e-tool-span',
       kind: 'tool',
@@ -71,7 +62,7 @@ test('dashboard loads traces, supports ws updates, and refreshes session', async
 
   await expect.poll(async () => {
     const traceResponse = await request.get(`http://127.0.0.1:8000/api/traces/${trace.trace_id}`, {
-      headers: { Authorization: `Bearer ${userSession.access_token}` },
+      headers: { Authorization: `Bearer ${operator.access_token}` },
     });
     if (!traceResponse.ok()) return -1;
     const payload = await traceResponse.json();

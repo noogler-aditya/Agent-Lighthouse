@@ -14,8 +14,7 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
-from database import init_db, close_db
-from routers import agents_router, state_router, traces_router, websocket_router, api_keys_router
+from routers import agents_router, auth_router, state_router, traces_router, websocket_router, api_keys_router
 from security import auth_health
 from services.connection_manager import ConnectionManager
 from services.redis_service import RedisService
@@ -28,21 +27,17 @@ settings = get_settings()
 
 
 def _validate_security_defaults():
-    if settings.require_auth and settings.jwt_secret_uses_default:
-        if settings.is_production:
-            raise RuntimeError("JWT_SECRET must be configured in production")
-        logger.warning("Using default JWT_SECRET; set a strong value before production")
-
-    if settings.require_auth and (not settings.supabase_url or not settings.supabase_anon_key):
-        if settings.is_production:
-            raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be configured in production")
-        logger.warning("Supabase auth not configured; set SUPABASE_URL and SUPABASE_ANON_KEY")
-
     if settings.require_auth and not settings.allowed_origins_list:
         raise RuntimeError("ALLOWED_ORIGINS cannot be empty when authentication is enabled")
 
     if settings.is_production and ("*" in settings.allowed_origins_list):
         raise RuntimeError("Wildcard ALLOWED_ORIGINS is not allowed in production")
+
+    if settings.require_auth and not settings.supabase_configured:
+        raise RuntimeError("Supabase auth is enabled but SUPABASE_URL/JWT settings are not configured")
+
+    if settings.is_production and settings.api_key_hash_salt == "dev-api-key-salt-change-me":
+        raise RuntimeError("API_KEY_HASH_SALT must be set to a strong value in production")
 
 
 _validate_security_defaults()
@@ -50,12 +45,7 @@ _validate_security_defaults()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan - connect/disconnect PostgreSQL, Redis."""
-    # PostgreSQL — user storage
-    db_pool = await init_db(settings.database_url)
-    app.state.db_pool = db_pool
-
-    # Redis — trace/span/state storage
+    """Application lifespan - connect/disconnect Redis and run readiness gates."""
     redis_service = RedisService(
         redis_url=settings.redis_url,
         trace_ttl_hours=settings.trace_ttl_hours,
@@ -79,7 +69,6 @@ async def lifespan(app: FastAPI):
 
     await redis_service.disconnect()
     logger.info("Disconnected from Redis")
-    await close_db()
 
 
 app = FastAPI(
@@ -112,17 +101,17 @@ async def request_context_middleware(request: Request, call_next):
 
         principal = getattr(request.state, "principal", None)
         subject = getattr(principal, "subject", "anonymous")
-        auth_type = getattr(principal, "auth_type", "-")
+        role = getattr(principal, "role", "-")
         trace_id = request.path_params.get("trace_id") if hasattr(request, "path_params") else None
         logger.info(
-            "request_id=%s method=%s path=%s status=%s latency_ms=%s subject=%s auth_type=%s trace_id=%s",
+            "request_id=%s method=%s path=%s status=%s latency_ms=%s subject=%s role=%s trace_id=%s",
             request_id,
             request.method,
             request.url.path,
             response.status_code,
             elapsed_ms,
             subject,
-            auth_type,
+            role,
             trace_id or "-",
         )
         response.headers["X-Request-ID"] = request_id
@@ -131,11 +120,12 @@ async def request_context_middleware(request: Request, call_next):
         request_id_ctx.reset(token)
 
 
+app.include_router(auth_router)
+app.include_router(api_keys_router)
 app.include_router(traces_router)
 app.include_router(agents_router)
 app.include_router(state_router)
 app.include_router(websocket_router)
-app.include_router(api_keys_router)
 
 
 @app.get("/")
