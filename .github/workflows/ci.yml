@@ -285,8 +285,14 @@ jobs:
 
   frontend-e2e:
     name: Frontend E2E (Playwright)
-    if: ${{ secrets.E2E_SUPABASE_ANON_KEY != '' }}
     runs-on: ubuntu-latest
+    env:
+      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      E2E_OPERATOR_EMAIL: ${{ secrets.E2E_OPERATOR_EMAIL }}
+      E2E_OPERATOR_PASSWORD: ${{ secrets.E2E_OPERATOR_PASSWORD }}
+      E2E_VIEWER_EMAIL: ${{ secrets.E2E_VIEWER_EMAIL }}
+      E2E_VIEWER_PASSWORD: ${{ secrets.E2E_VIEWER_PASSWORD }}
     services:
       redis:
         image: redis:7-alpine
@@ -351,14 +357,12 @@ jobs:
         run: npx --prefix frontend playwright install --with-deps chromium
 
       - name: Run frontend e2e
-        env:
-          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
-          E2E_OPERATOR_EMAIL: ${{ secrets.E2E_OPERATOR_EMAIL }}
-          E2E_OPERATOR_PASSWORD: ${{ secrets.E2E_OPERATOR_PASSWORD }}
-          E2E_VIEWER_EMAIL: ${{ secrets.E2E_VIEWER_EMAIL }}
-          E2E_VIEWER_PASSWORD: ${{ secrets.E2E_VIEWER_PASSWORD }}
+        if: ${{ env.E2E_SUPABASE_ANON_KEY != '' }}
         run: npm run e2e --prefix frontend
+
+      - name: Skip frontend e2e (missing secrets)
+        if: ${{ env.E2E_SUPABASE_ANON_KEY == '' }}
+        run: echo "Skipping frontend e2e because Supabase E2E secrets are not configured."
 
       - name: Stop backend
         if: always()
