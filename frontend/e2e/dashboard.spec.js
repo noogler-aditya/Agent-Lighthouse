@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import process from 'node:process';
 
 async function loginViaApi(request, email, password) {
   const supabaseUrl = process.env.E2E_SUPABASE_URL || 'http://127.0.0.1:54321';

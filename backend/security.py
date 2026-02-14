@@ -254,7 +254,22 @@ def require_role(minimum_role: str) -> Callable:
     return _dependency
 
 
-def require_user_or_machine(minimum_role: str, scope: str) -> Callable:
+def require_auth(minimum_role: str = "viewer") -> Callable:
+    return require_role(minimum_role)
+
+
+def require_user_or_machine(minimum_role: str, scope: Optional[str] = None) -> Callable:
+    # Backward-compatible form: require_user_or_machine("trace:read")
+    if scope is None:
+        resolved_scope = minimum_role
+        if resolved_scope.endswith(":write"):
+            resolved_minimum_role = "operator"
+        else:
+            resolved_minimum_role = "viewer"
+    else:
+        resolved_scope = scope
+        resolved_minimum_role = minimum_role
+
     async def _dependency(
         request: Request,
         authorization: Optional[str] = Header(default=None, alias="Authorization"),
@@ -272,13 +287,15 @@ def require_user_or_machine(minimum_role: str, scope: str) -> Callable:
         if authorization:
             try:
                 candidate = _user_principal(authorization, settings)
-                _ensure_role(candidate, minimum_role)
+                _ensure_role(candidate, resolved_minimum_role)
                 principal = candidate
             except Exception as exc:  # noqa: BLE001
                 user_auth_error = exc
 
         if principal is None and x_api_key:
-            principal = await _resolve_api_key(request, x_api_key, settings, scope, minimum_role)
+            principal = await _resolve_api_key(
+                request, x_api_key, settings, resolved_scope, resolved_minimum_role
+            )
 
         if principal is None:
             raise user_auth_error if isinstance(user_auth_error, HTTPException) else AuthError("Unauthorized")
