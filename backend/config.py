@@ -2,18 +2,12 @@
 Application settings for Agent Lighthouse backend.
 """
 from functools import lru_cache
-import os
 from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_FILE = Path(__file__).resolve().with_name(".env")
-
-# Dev-only fallback prefix (never hardcode the full secret)
-_DEV_SECRET_PREFIX = "dev-only-unsafe-"  # nosec B105
-_DEV_SECRET = _DEV_SECRET_PREFIX + os.urandom(8).hex()
-_DEV_API_KEY = "dev-" + os.urandom(4).hex()
 
 
 class Settings(BaseSettings):
@@ -26,13 +20,6 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     build_version: str = Field(default="dev", alias="BUILD_VERSION")
 
-    # PostgreSQL — user storage
-    database_url: str = Field(
-        default="postgresql://lighthouse:lighthouse@localhost:5432/lighthouse",
-        alias="DATABASE_URL",
-    )
-
-    # Redis — trace/span/state storage
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
     redis_connect_timeout_seconds: int = Field(default=5, alias="REDIS_CONNECT_TIMEOUT_SECONDS")
     redis_required_appendonly: str = Field(default="yes", alias="REDIS_REQUIRED_APPENDONLY")
@@ -42,20 +29,16 @@ class Settings(BaseSettings):
     allowed_origins: str = Field(default="http://localhost:5173", alias="ALLOWED_ORIGINS")
     cors_allow_credentials: bool = Field(default=False, alias="CORS_ALLOW_CREDENTIALS")
 
-    # Auth settings
     require_auth: bool = Field(default=True, alias="REQUIRE_AUTH")
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
-    supabase_anon_key: str = Field(default="", alias="SUPABASE_ANON_KEY")
-    jwt_secret: str = Field(default=_DEV_SECRET, alias="JWT_SECRET")
-    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
-    jwt_issuer: str = Field(default="agent-lighthouse", alias="JWT_ISSUER")
-    jwt_audience: str = Field(default="agent-lighthouse-ui", alias="JWT_AUDIENCE")
-    access_token_ttl_minutes: int = Field(default=15, alias="ACCESS_TOKEN_TTL_MINUTES")
-    refresh_token_ttl_minutes: int = Field(default=43200, alias="REFRESH_TOKEN_TTL_MINUTES")
+    supabase_jwt_issuer: str = Field(default="", alias="SUPABASE_JWT_ISSUER")
+    supabase_jwt_audience: str = Field(default="authenticated", alias="SUPABASE_JWT_AUDIENCE")
+    supabase_role_claim: str = Field(default="app_metadata.role", alias="SUPABASE_ROLE_CLAIM")
+    supabase_role_map: str = Field(default="authenticated:viewer,service_role:admin", alias="SUPABASE_ROLE_MAP")
+    supabase_test_jwt_secret: str = Field(default="", alias="SUPABASE_TEST_JWT_SECRET")
 
-    # Machine API keys for backward-compatible SDK access (optional)
     machine_api_keys: str = Field(default="", alias="MACHINE_API_KEYS")
-    legacy_api_key: str = Field(default=_DEV_API_KEY, alias="LIGHTHOUSE_API_KEY")
+    legacy_api_key: str = Field(default="local-dev-key", alias="LIGHTHOUSE_API_KEY")
 
     trace_ttl_hours: int = Field(default=24, alias="TRACE_TTL_HOURS")
 
@@ -75,6 +58,31 @@ class Settings(BaseSettings):
         return self.app_env.lower() == "production"
 
     @property
+    def supabase_jwks_url(self) -> str:
+        base = self.supabase_url.rstrip("/")
+        return f"{base}/auth/v1/.well-known/jwks.json" if base else ""
+
+    @property
+    def supabase_effective_issuer(self) -> str:
+        if self.supabase_jwt_issuer:
+            return self.supabase_jwt_issuer
+        base = self.supabase_url.rstrip("/")
+        return f"{base}/auth/v1" if base else ""
+
+    @property
+    def supabase_role_map_dict(self) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        for raw in self.supabase_role_map.split(","):
+            item = raw.strip()
+            if not item:
+                continue
+            source, sep, target = item.partition(":")
+            if not sep:
+                continue
+            mapping[source.strip()] = target.strip()
+        return mapping
+
+    @property
     def machine_api_keys_map(self) -> dict[str, set[str]]:
         scoped: dict[str, set[str]] = {}
         for raw in self.machine_api_keys.split(","):
@@ -88,17 +96,12 @@ class Settings(BaseSettings):
             if scopes:
                 scoped[key.strip()] = scopes
         if not scoped and self.legacy_api_key.strip():
-            scoped[self.legacy_api_key.strip()] = {
-                "trace:write",
-                "trace:read",
-                "state:write",
-                "state:read",
-            }
+            scoped[self.legacy_api_key.strip()] = {"trace:write", "trace:read"}
         return scoped
 
     @property
-    def jwt_secret_uses_default(self) -> bool:
-        return self.jwt_secret.startswith(_DEV_SECRET_PREFIX)
+    def supabase_configured(self) -> bool:
+        return bool(self.supabase_url and self.supabase_effective_issuer and self.supabase_jwks_url)
 
 
 @lru_cache

@@ -1,5 +1,5 @@
-import os
 import sys
+import os
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -9,21 +9,45 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-os.environ.setdefault("SUPABASE_URL", "test")
-os.environ.setdefault("SUPABASE_ANON_KEY", "test")
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("SUPABASE_URL", "http://localhost:54321")
+os.environ.setdefault("SUPABASE_JWT_ISSUER", "http://localhost:54321/auth/v1")
+os.environ.setdefault("SUPABASE_JWT_AUDIENCE", "authenticated")
+os.environ.setdefault("SUPABASE_TEST_JWT_SECRET", "integration-test-secret")
 
 from config import get_settings  # noqa: E402
-import database  # noqa: E402
 from dependencies import get_connection_manager, get_redis  # noqa: E402
 from main import app  # noqa: E402
 from models.trace import Trace  # noqa: E402
-get_settings.cache_clear()
+from security import create_access_token  # noqa: E402
 
 
 class FakeRedisService:
     def __init__(self) -> None:
         self.traces: dict[str, Trace] = {}
         self.states: dict[str, object] = {}
+        self.kv: dict[str, str] = {}
+        self.expiry: dict[str, int] = {}
+
+    async def get(self, key: str) -> Optional[str]:
+        return self.kv.get(key)
+
+    async def set(self, key: str, value: str, ex: Optional[int] = None) -> None:
+        self.kv[key] = value
+        if ex is not None:
+            self.expiry[key] = ex
+
+    async def incr(self, key: str) -> int:
+        value = int(self.kv.get(key, "0")) + 1
+        self.kv[key] = str(value)
+        return value
+
+    async def expire(self, key: str, seconds: int) -> None:
+        self.expiry[key] = seconds
+
+    async def delete(self, key: str) -> None:
+        self.kv.pop(key, None)
+        self.expiry.pop(key, None)
 
     async def list_traces(self, offset: int = 0, limit: int = 50, status: Optional[str] = None) -> list[Trace]:
         traces = sorted(self.traces.values(), key=lambda t: t.start_time, reverse=True)
@@ -116,32 +140,17 @@ class FakeConnectionManager:
         )
 
 
-class FakeDbPool:
-    def __init__(self) -> None:
-        self.api_keys: dict[str, str] = {}
-
-    async def fetchrow(self, _query: str, supabase_user_id: str):
-        api_key = self.api_keys.get(supabase_user_id)
-        if not api_key:
-            return None
-        return {"api_key": api_key}
-
-    async def execute(self, _query: str, supabase_user_id: str, api_key: str):
-        if supabase_user_id not in self.api_keys:
-            self.api_keys[supabase_user_id] = api_key
-        return "EXECUTE 1"
-
-
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
-    return {"Authorization": "Bearer test-token"}
+    settings = get_settings()
+    token = create_access_token(settings, subject="test-operator", role="operator")
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
 def client_and_store():
     fake_redis = FakeRedisService()
     fake_manager = FakeConnectionManager()
-    fake_db_pool = FakeDbPool()
 
     @asynccontextmanager
     async def _no_op_lifespan(_app):
@@ -149,14 +158,12 @@ def client_and_store():
 
     original_lifespan = app.router.lifespan_context
     app.router.lifespan_context = _no_op_lifespan
-    original_pool = database._pool
     original_redis_service = getattr(app.state, "redis_service", None)
     original_connection_manager = getattr(app.state, "connection_manager", None)
     original_settings = getattr(app.state, "settings", None)
     app.state.redis_service = fake_redis
     app.state.connection_manager = fake_manager
     app.state.settings = get_settings()
-    database._pool = fake_db_pool
     app.dependency_overrides[get_redis] = lambda: fake_redis
     app.dependency_overrides[get_connection_manager] = lambda: fake_manager
 
@@ -165,7 +172,6 @@ def client_and_store():
 
     app.dependency_overrides.clear()
     app.router.lifespan_context = original_lifespan
-    database._pool = original_pool
     if original_redis_service is not None:
         app.state.redis_service = original_redis_service
     else:
