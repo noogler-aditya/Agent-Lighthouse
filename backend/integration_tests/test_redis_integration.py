@@ -26,6 +26,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 
 from config import get_settings  # noqa: E402
 from main import app  # noqa: E402
+from security import create_access_token  # noqa: E402
 
 
 def _flush_redis():
@@ -34,9 +35,10 @@ def _flush_redis():
     client.close()
 
 
-def _auth_headers(subject: str) -> dict[str, str]:
-    del subject
-    return {"Authorization": "Bearer test-token"}
+def _auth_headers(role: str, subject: str) -> dict[str, str]:
+    settings = get_settings()
+    token = create_access_token(settings, subject=subject, role=role)
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture(autouse=True)
@@ -74,11 +76,12 @@ def test_health_contracts_include_dependency_details(client):
 
 
 def test_trace_write_and_read_with_real_redis(client):
-    user_headers = _auth_headers("integration-user")
+    operator_headers = _auth_headers("operator", "integration-operator")
+    viewer_headers = _auth_headers("viewer", "integration-viewer")
 
     create_trace = client.post(
         "/api/traces",
-        headers=user_headers,
+        headers=operator_headers,
         json={"name": "integration-trace", "metadata": {"suite": "integration"}},
     )
     assert create_trace.status_code == 200
@@ -86,12 +89,12 @@ def test_trace_write_and_read_with_real_redis(client):
 
     create_span = client.post(
         f"/api/traces/{trace_id}/spans",
-        headers=user_headers,
+        headers=operator_headers,
         json={"name": "tool-span", "kind": "tool"},
     )
     assert create_span.status_code == 200
 
-    read_trace = client.get(f"/api/traces/{trace_id}", headers=user_headers)
+    read_trace = client.get(f"/api/traces/{trace_id}", headers=viewer_headers)
     assert read_trace.status_code == 200
     payload = read_trace.json()
     assert payload["trace_id"] == trace_id
@@ -99,7 +102,7 @@ def test_trace_write_and_read_with_real_redis(client):
 
 
 def test_write_rate_limit_enforced(client):
-    headers = _auth_headers("rate-limit-user")
+    headers = _auth_headers("operator", "rate-limit-user")
     statuses: list[int] = []
     for idx in range(6):
         response = client.post(

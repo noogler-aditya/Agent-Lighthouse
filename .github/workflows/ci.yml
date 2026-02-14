@@ -220,7 +220,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"name":"machine-trace"}' | python -c "import sys,json; print(json.load(sys.stdin)['trace_id'])")
           state_with_machine=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "X-API-Key: ci-key" "http://127.0.0.1:8000/api/state/${trace_id}/pause")
-          test "$state_with_machine" = "401"
+          test "$state_with_machine" = "403"
 
       - name: Run smoke trace check
         env:

@@ -32,7 +32,7 @@ def test_machine_key_scope_allows_trace_ingestion_only(client_and_store):
     trace_id = create_trace.json()["trace_id"]
 
     state_write = client.post(f"/api/state/{trace_id}/pause", headers={"X-API-Key": machine_key})
-    assert state_write.status_code == 401
+    assert state_write.status_code == 403
 
 
 def test_user_api_key_allows_trace_write(client_and_store):
