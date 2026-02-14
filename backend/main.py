@@ -36,6 +36,9 @@ def _validate_security_defaults():
     if settings.require_auth and not settings.supabase_configured:
         raise RuntimeError("Supabase auth is enabled but SUPABASE_URL/JWT settings are not configured")
 
+    if settings.is_production and settings.api_key_hash_salt == "dev-api-key-salt-change-me":
+        raise RuntimeError("API_KEY_HASH_SALT must be set to a strong value in production")
+
 
 _validate_security_defaults()
 

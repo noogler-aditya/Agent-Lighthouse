@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     supabase_role_claim: str = Field(default="app_metadata.role", alias="SUPABASE_ROLE_CLAIM")
     supabase_role_map: str = Field(default="authenticated:viewer,service_role:admin", alias="SUPABASE_ROLE_MAP")
     supabase_test_jwt_secret: str = Field(default="", alias="SUPABASE_TEST_JWT_SECRET")
+    api_key_hash_salt: str = Field(default="dev-api-key-salt-change-me", alias="API_KEY_HASH_SALT")
+    api_key_hash_iterations: int = Field(default=390000, alias="API_KEY_HASH_ITERATIONS")
 
     machine_api_keys: str = Field(default="", alias="MACHINE_API_KEYS")
     legacy_api_key: str = Field(default="local-dev-key", alias="LIGHTHOUSE_API_KEY")

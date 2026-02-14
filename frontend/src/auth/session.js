@@ -1,13 +1,9 @@
 import { API_BASE_URL, SUPABASE_ANON_KEY, SUPABASE_URL } from '../config';
 
-const REFRESH_TOKEN_KEY = 'lighthouse_refresh_token';
-const USER_ROLE_KEY = 'lighthouse_user_role';
-const USER_SUBJECT_KEY = 'lighthouse_user_subject';
-
 let accessToken = '';
-let refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY) || '';
-let subject = sessionStorage.getItem(USER_SUBJECT_KEY) || '';
-let role = sessionStorage.getItem(USER_ROLE_KEY) || '';
+let refreshToken = '';
+let subject = '';
+let role = '';
 let refreshPromise = null;
 
 function parseJwt(token) {
@@ -31,19 +27,12 @@ function persistSession(token, nextRefreshToken) {
   accessToken = token || '';
   refreshToken = nextRefreshToken || '';
 
-  if (refreshToken) sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  else sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-
   if (accessToken) {
     const payload = parseJwt(accessToken) || {};
     subject = payload.sub || '';
     const rawRole = payload?.app_metadata?.role || payload?.role || 'viewer';
     role = String(rawRole || 'viewer');
-    if (subject) sessionStorage.setItem(USER_SUBJECT_KEY, subject);
-    if (role) sessionStorage.setItem(USER_ROLE_KEY, role);
   } else {
-    sessionStorage.removeItem(USER_SUBJECT_KEY);
-    sessionStorage.removeItem(USER_ROLE_KEY);
     subject = '';
     role = '';
   }

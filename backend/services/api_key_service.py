@@ -9,6 +9,7 @@ import logging
 import secrets
 from typing import Optional
 
+from config import get_settings
 from services.redis_service import RedisService
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,15 @@ def _generate_api_key() -> str:
 
 
 def _hash_api_key(api_key: str) -> str:
-    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    settings = get_settings()
+    salt = settings.api_key_hash_salt.encode("utf-8")
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        api_key.encode("utf-8"),
+        salt,
+        settings.api_key_hash_iterations,
+    )
+    return digest.hex()
 
 
 async def get_user_principal_by_api_key(redis_service: RedisService, api_key: str) -> Optional[tuple[str, str]]:
