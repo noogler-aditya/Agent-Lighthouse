@@ -1,7 +1,7 @@
 import { Bot, Coins, Radar, SearchCode } from './icons/AppIcons';
+import { Link } from 'react-router-dom';
 import './LandingPage.css';
 
-const DOCS_URL = 'https://github.com/noogler-aditya/Agent-Lighthouse/blob/main/docs/GETTING_STARTED.md';
 const REPO_URL = 'https://github.com/noogler-aditya/Agent-Lighthouse';
 
 const featureCards = [
@@ -54,7 +54,7 @@ export function LandingPage({ onLoginClick }) {
 
           <div className="landing-nav-actions">
             <a href={REPO_URL} target="_blank" rel="noreferrer" className="landing-nav-link">GitHub</a>
-            <a href={DOCS_URL} target="_blank" rel="noreferrer" className="landing-nav-link">Docs</a>
+            <Link to="/docs" className="landing-nav-link">Docs</Link>
             <button type="button" className="btn btn-secondary btn-sm" onClick={onLoginClick}>Sign In</button>
           </div>
         </nav>
@@ -76,14 +76,13 @@ export function LandingPage({ onLoginClick }) {
               <button type="button" className="btn btn-primary landing-btn-lg" onClick={onLoginClick}>
                 Start Debugging
               </button>
-              <a href={DOCS_URL} target="_blank" rel="noreferrer" className="btn btn-secondary landing-btn-lg">
-                View Docs
-              </a>
             </div>
           </div>
 
           <aside className="landing-hero-visual" aria-hidden="true" data-animate="enter" data-delay="2">
             <div className="landing-radar-shell">
+              <div className="landing-radar-sweep" />
+              <div className="landing-radar-glow" />
               <Radar className="landing-radar-icon" />
               <div className="landing-radar-ring ring-one" />
               <div className="landing-radar-ring ring-two" />
@@ -139,7 +138,7 @@ export function LandingPage({ onLoginClick }) {
         <p>MIT licensed. Built for production debugging workflows.</p>
         <div className="landing-footer-links">
           <a href={REPO_URL} target="_blank" rel="noreferrer">Repository</a>
-          <a href={DOCS_URL} target="_blank" rel="noreferrer">Documentation</a>
+          <Link to="/docs">Documentation</Link>
         </div>
       </footer>
     </div>

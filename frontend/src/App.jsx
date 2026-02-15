@@ -6,6 +6,7 @@ import { bootstrapSession, clearSession, getAuthContext, loginWithPassword, regi
 import { useWebSocket, useTraces, useAgentState, useToast } from './hooks';
 import { Sidebar } from './components/Sidebar';
 import { LandingPage } from './components/LandingPage';
+import { DocsPage } from './components/DocsPage';
 import { AuthModal } from './components/AuthModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { OnboardingPanel } from './components/OnboardingPanel';
@@ -287,6 +288,22 @@ function App() {
     </>
   );
 
+  const docsElement = (
+    <>
+      <DocsPage
+        isAuthenticated={authContext.isAuthenticated}
+        onLoginClick={() => setIsAuthModalOpen(true)}
+      />
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={handleAuthModalClose}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+      />
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
+    </>
+  );
+
   const dashboardElement = (
     <div className="app-container">
       <aside className={`left-rail ${sidebarCollapsed ? 'collapsed' : ''}`}>
@@ -537,6 +554,7 @@ function App() {
               : <Navigate to="/?login=1" replace />
           }
         />
+        <Route path="/docs" element={docsElement} />
         <Route
           path="*"
           element={
