@@ -51,14 +51,15 @@ class LighthouseClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8000",
+        base_url: Optional[str] = None,
         timeout: float = 10.0,
         api_key: Optional[str] = None,
         fail_silent: bool = True,
         max_retries: int = _DEFAULT_MAX_RETRIES,
         backoff_base: float = _DEFAULT_BACKOFF_BASE,
     ):
-        self.base_url = base_url.rstrip("/")
+        resolved_url = base_url or os.getenv("LIGHTHOUSE_BASE_URL", "https://agent-lighthouse.onrender.com")
+        self.base_url = resolved_url.rstrip("/")
         self.timeout = timeout
         self.api_key = api_key or os.getenv("LIGHTHOUSE_API_KEY")
         self.fail_silent = fail_silent

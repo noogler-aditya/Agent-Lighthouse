@@ -96,13 +96,17 @@ def test_trace_tool_decorator_uses_active_trace_context():
     assert fake_client.updated_spans >= 1
 
 
-def test_trace_tool_no_active_trace_runs_without_span():
+def test_trace_tool_no_active_trace_auto_creates_trace():
+    """When no trace is active, decorators should auto-create a trace and span
+    so that data is never silently dropped (the empty-dashboard bug fix)."""
     tracer, fake_client = _new_fake_tracer()
     tracer_module._global_tracer = tracer
 
-    @tracer_module.trace_tool("no-trace")
+    @tracer_module.trace_tool("auto-traced")
     def plain_tool(x: int) -> int:
         return x * 2
 
     assert plain_tool(3) == 6
-    assert fake_client.spans_created == 0
+    # A trace and span should both be auto-created
+    assert fake_client.traces_created == 1
+    assert fake_client.spans_created == 1

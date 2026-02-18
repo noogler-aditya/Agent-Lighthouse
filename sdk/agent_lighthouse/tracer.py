@@ -64,7 +64,7 @@ class LighthouseTracer:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8000",
+        base_url: Optional[str] = None,
         framework: Optional[str] = None,
         auto_pause_check: bool = True,
         api_key: Optional[str] = None,
@@ -72,8 +72,10 @@ class LighthouseTracer:
         max_retries: int = 3,
         capture_output: bool = True,
     ):
+        import os
+        resolved_url = base_url or os.getenv("LIGHTHOUSE_BASE_URL", "https://agent-lighthouse.onrender.com")
         self.client = LighthouseClient(
-            base_url=base_url,
+            base_url=resolved_url,
             api_key=api_key,
             fail_silent=fail_silent,
             max_retries=max_retries,
@@ -444,7 +446,7 @@ _global_tracer: Optional[LighthouseTracer] = None
 
 
 def get_tracer(
-    base_url: str = "http://localhost:8000",
+    base_url: Optional[str] = None,
     framework: Optional[str] = None,
     api_key: Optional[str] = None,
     fail_silent: bool = True,
@@ -457,8 +459,10 @@ def get_tracer(
 
     global _global_tracer
     if _global_tracer is None:
+        import os
+        resolved_url = base_url or os.getenv("LIGHTHOUSE_BASE_URL", "https://agent-lighthouse.onrender.com")
         _global_tracer = LighthouseTracer(
-            base_url=base_url,
+            base_url=resolved_url,
             framework=framework,
             api_key=api_key,
             fail_silent=fail_silent,
@@ -502,41 +506,67 @@ def trace_agent(
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 tracer = get_tracer()
-                if not tracer.trace_id:
-                    return await func(*args, **kwargs)
-
                 input_data = _capture_args(args, kwargs)
-                async with tracer.aspan(
-                    name=agent_name,
-                    kind="agent",
-                    agent_id=_agent_id,
-                    agent_name=agent_name,
-                    input_data=input_data,
-                ):
-                    result = await func(*args, **kwargs)
-                    if capture_output and tracer.capture_output_enabled:
-                        tracer.record_output(_capture_output(result) or {})
-                    return result
+
+                if not tracer.trace_id:
+                    # Auto-create a per-call trace so standalone decorated functions work
+                    async with tracer.atrace(name=agent_name, metadata={"auto_trace": True}):
+                        async with tracer.aspan(
+                            name=agent_name,
+                            kind="agent",
+                            agent_id=_agent_id,
+                            agent_name=agent_name,
+                            input_data=input_data,
+                        ):
+                            result = await func(*args, **kwargs)
+                            if capture_output and tracer.capture_output_enabled:
+                                tracer.record_output(_capture_output(result) or {})
+                            return result
+                else:
+                    async with tracer.aspan(
+                        name=agent_name,
+                        kind="agent",
+                        agent_id=_agent_id,
+                        agent_name=agent_name,
+                        input_data=input_data,
+                    ):
+                        result = await func(*args, **kwargs)
+                        if capture_output and tracer.capture_output_enabled:
+                            tracer.record_output(_capture_output(result) or {})
+                        return result
             return async_wrapper
         else:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 tracer = get_tracer()
-                if not tracer.trace_id:
-                    return func(*args, **kwargs)
-
                 input_data = _capture_args(args, kwargs)
-                with tracer.span(
-                    name=agent_name,
-                    kind="agent",
-                    agent_id=_agent_id,
-                    agent_name=agent_name,
-                    input_data=input_data,
-                ):
-                    result = func(*args, **kwargs)
-                    if capture_output and tracer.capture_output_enabled:
-                        tracer.record_output(_capture_output(result) or {})
-                    return result
+
+                if not tracer.trace_id:
+                    # Auto-create a per-call trace so standalone decorated functions work
+                    with tracer.trace(name=agent_name, metadata={"auto_trace": True}):
+                        with tracer.span(
+                            name=agent_name,
+                            kind="agent",
+                            agent_id=_agent_id,
+                            agent_name=agent_name,
+                            input_data=input_data,
+                        ):
+                            result = func(*args, **kwargs)
+                            if capture_output and tracer.capture_output_enabled:
+                                tracer.record_output(_capture_output(result) or {})
+                            return result
+                else:
+                    with tracer.span(
+                        name=agent_name,
+                        kind="agent",
+                        agent_id=_agent_id,
+                        agent_name=agent_name,
+                        input_data=input_data,
+                    ):
+                        result = func(*args, **kwargs)
+                        if capture_output and tracer.capture_output_enabled:
+                            tracer.record_output(_capture_output(result) or {})
+                        return result
             return sync_wrapper
     return decorator
 
@@ -556,37 +586,57 @@ def trace_tool(name: Optional[str] = None, capture_output: bool = True):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 tracer = get_tracer()
-                if not tracer.trace_id:
-                    return await func(*args, **kwargs)
-
                 input_data = _capture_args(args, kwargs)
-                async with tracer.aspan(
-                    name=tool_name,
-                    kind="tool",
-                    input_data=input_data,
-                ):
-                    result = await func(*args, **kwargs)
-                    if capture_output and tracer.capture_output_enabled:
-                        tracer.record_output(_capture_output(result) or {})
-                    return result
+
+                if not tracer.trace_id:
+                    async with tracer.atrace(name=tool_name, metadata={"auto_trace": True}):
+                        async with tracer.aspan(
+                            name=tool_name,
+                            kind="tool",
+                            input_data=input_data,
+                        ):
+                            result = await func(*args, **kwargs)
+                            if capture_output and tracer.capture_output_enabled:
+                                tracer.record_output(_capture_output(result) or {})
+                            return result
+                else:
+                    async with tracer.aspan(
+                        name=tool_name,
+                        kind="tool",
+                        input_data=input_data,
+                    ):
+                        result = await func(*args, **kwargs)
+                        if capture_output and tracer.capture_output_enabled:
+                            tracer.record_output(_capture_output(result) or {})
+                        return result
             return async_wrapper
         else:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 tracer = get_tracer()
-                if not tracer.trace_id:
-                    return func(*args, **kwargs)
-
                 input_data = _capture_args(args, kwargs)
-                with tracer.span(
-                    name=tool_name,
-                    kind="tool",
-                    input_data=input_data,
-                ):
-                    result = func(*args, **kwargs)
-                    if capture_output and tracer.capture_output_enabled:
-                        tracer.record_output(_capture_output(result) or {})
-                    return result
+
+                if not tracer.trace_id:
+                    with tracer.trace(name=tool_name, metadata={"auto_trace": True}):
+                        with tracer.span(
+                            name=tool_name,
+                            kind="tool",
+                            input_data=input_data,
+                        ):
+                            result = func(*args, **kwargs)
+                            if capture_output and tracer.capture_output_enabled:
+                                tracer.record_output(_capture_output(result) or {})
+                            return result
+                else:
+                    with tracer.span(
+                        name=tool_name,
+                        kind="tool",
+                        input_data=input_data,
+                    ):
+                        result = func(*args, **kwargs)
+                        if capture_output and tracer.capture_output_enabled:
+                            tracer.record_output(_capture_output(result) or {})
+                        return result
             return sync_wrapper
     return decorator
 
@@ -613,45 +663,73 @@ def trace_llm(
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 tracer = get_tracer()
-                if not tracer.trace_id:
-                    return await func(*args, **kwargs)
-
                 input_data = _capture_args(args, kwargs)
-                async with tracer.aspan(
-                    name=name,
-                    kind="llm",
-                    input_data=input_data,
-                    attributes={"model": model} if model else {},
-                ):
-                    result = await func(*args, **kwargs)
-                    _extract_and_record_tokens(
-                        tracer, result, model, cost_per_1k_prompt, cost_per_1k_completion
-                    )
-                    if capture_output and tracer.capture_output_enabled:
-                        tracer.record_output(_capture_output(result) or {})
-                    return result
+
+                if not tracer.trace_id:
+                    async with tracer.atrace(name=name, metadata={"auto_trace": True, "model": model}):
+                        async with tracer.aspan(
+                            name=name,
+                            kind="llm",
+                            input_data=input_data,
+                            attributes={"model": model} if model else {},
+                        ):
+                            result = await func(*args, **kwargs)
+                            _extract_and_record_tokens(
+                                tracer, result, model, cost_per_1k_prompt, cost_per_1k_completion
+                            )
+                            if capture_output and tracer.capture_output_enabled:
+                                tracer.record_output(_capture_output(result) or {})
+                            return result
+                else:
+                    async with tracer.aspan(
+                        name=name,
+                        kind="llm",
+                        input_data=input_data,
+                        attributes={"model": model} if model else {},
+                    ):
+                        result = await func(*args, **kwargs)
+                        _extract_and_record_tokens(
+                            tracer, result, model, cost_per_1k_prompt, cost_per_1k_completion
+                        )
+                        if capture_output and tracer.capture_output_enabled:
+                            tracer.record_output(_capture_output(result) or {})
+                        return result
             return async_wrapper
         else:
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 tracer = get_tracer()
-                if not tracer.trace_id:
-                    return func(*args, **kwargs)
-
                 input_data = _capture_args(args, kwargs)
-                with tracer.span(
-                    name=name,
-                    kind="llm",
-                    input_data=input_data,
-                    attributes={"model": model} if model else {},
-                ):
-                    result = func(*args, **kwargs)
-                    _extract_and_record_tokens(
-                        tracer, result, model, cost_per_1k_prompt, cost_per_1k_completion
-                    )
-                    if capture_output and tracer.capture_output_enabled:
-                        tracer.record_output(_capture_output(result) or {})
-                    return result
+
+                if not tracer.trace_id:
+                    with tracer.trace(name=name, metadata={"auto_trace": True, "model": model}):
+                        with tracer.span(
+                            name=name,
+                            kind="llm",
+                            input_data=input_data,
+                            attributes={"model": model} if model else {},
+                        ):
+                            result = func(*args, **kwargs)
+                            _extract_and_record_tokens(
+                                tracer, result, model, cost_per_1k_prompt, cost_per_1k_completion
+                            )
+                            if capture_output and tracer.capture_output_enabled:
+                                tracer.record_output(_capture_output(result) or {})
+                            return result
+                else:
+                    with tracer.span(
+                        name=name,
+                        kind="llm",
+                        input_data=input_data,
+                        attributes={"model": model} if model else {},
+                    ):
+                        result = func(*args, **kwargs)
+                        _extract_and_record_tokens(
+                            tracer, result, model, cost_per_1k_prompt, cost_per_1k_completion
+                        )
+                        if capture_output and tracer.capture_output_enabled:
+                            tracer.record_output(_capture_output(result) or {})
+                        return result
             return sync_wrapper
     return decorator
 
