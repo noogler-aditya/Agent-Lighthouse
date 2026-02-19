@@ -7,7 +7,7 @@ packages = ["agent_lighthouse"]
 
 [project]
 name = "agent-lighthouse"
-version = "0.3.0"
+version = "0.3.1"
 description = "Multi-Agent Observability SDK for Agent Lighthouse"
 readme = "README.md"
 requires-python = ">=3.9"
