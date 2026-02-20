@@ -81,6 +81,7 @@ async def _resolve_api_key(api_key: str, settings: Settings) -> Principal:
 
     # 1. Check user-generated API keys (from PostgreSQL)
     if key.startswith("lh_"):
+        # 1a. Check the "users" table (username/password registration flow)
         try:
             from services.user_service import get_user_by_api_key
             user = await get_user_by_api_key(key)
@@ -92,7 +93,21 @@ async def _resolve_api_key(api_key: str, settings: Settings) -> Principal:
                     user_id=user["id"],
                 )
         except Exception as db_exc:
-            logger.debug("User API key lookup failed, falling through to machine keys: %s", db_exc)
+            logger.debug("User API key lookup failed, falling through: %s", db_exc)
+
+        # 1b. Check the "api_keys" table (Supabase authentication flow)
+        try:
+            from services.api_key_service import get_user_id_by_api_key
+            supabase_user_id = await get_user_id_by_api_key(key)
+            if supabase_user_id:
+                return Principal(
+                    subject=supabase_user_id,
+                    auth_type="api_key",
+                    scopes={"trace:write", "trace:read"},
+                    user_id=supabase_user_id,
+                )
+        except Exception as db_exc:
+            logger.debug("Supabase API key lookup failed, falling through to machine keys: %s", db_exc)
 
     # 2. Check machine API keys (env var — backward compatible)
     for known_key, scopes in settings.machine_api_keys_map.items():

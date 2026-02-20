@@ -249,6 +249,21 @@
   padding: 12px 20px;
 }
 
+.landing-install-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 16px;
+  background: #0b1220;
+  color: #a5b4fc;
+  border: 1px solid #1f2b41;
+  border-radius: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+  user-select: all;
+  cursor: text;
+}
+
 .landing-hero-visual {
   border: 1px solid var(--border-primary);
   background: linear-gradient(140deg, #ffffff 0%, #f7fafc 100%);
@@ -546,6 +561,7 @@
     opacity: 0;
     transform: translateY(12px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -553,11 +569,13 @@
 }
 
 @keyframes landingPulse {
+
   0%,
   100% {
     transform: scale(0.985);
     opacity: 0.44;
   }
+
   50% {
     transform: scale(1);
     opacity: 0.75;
@@ -568,17 +586,20 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
 }
 
 @keyframes landingGlow {
+
   0%,
   100% {
     transform: scale(0.96);
     opacity: 0.52;
   }
+
   50% {
     transform: scale(1.05);
     opacity: 0.85;
@@ -646,6 +667,11 @@
 
   .landing-btn-lg {
     width: 100%;
+  }
+
+  .landing-install-badge {
+    font-size: 0.78rem;
+    padding: 8px 12px;
   }
 }
 

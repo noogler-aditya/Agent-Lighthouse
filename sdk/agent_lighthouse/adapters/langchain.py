@@ -141,6 +141,27 @@ class LighthouseLangChainCallbackHandler:  # type: ignore[misc]
             attributes={"model": model} if model else {},
         )
 
+    def on_chat_model_start(self, serialized: dict, messages: list, run_id: str, **kwargs: Any):
+        """Handle modern Chat model calls (ChatOllama, ChatOpenAI, ChatAnthropic, etc.)."""
+        model = serialized.get("name") if isinstance(serialized, dict) else None
+        model = model or (serialized.get("kwargs", {}).get("model") if isinstance(serialized, dict) else None)
+        # Flatten messages for input capture
+        flat = []
+        for msg_list in messages:
+            for msg in (msg_list if isinstance(msg_list, list) else [msg_list]):
+                try:
+                    flat.append({"type": getattr(msg, "type", "unknown"), "content": str(getattr(msg, "content", msg))[:500]})
+                except Exception:  # noqa: BLE001
+                    flat.append({"content": str(msg)[:500]})
+        input_data = {"messages": flat} if flat else None
+        self._start_span(
+            run_id=run_id,
+            name=f"Chat Model ({model or 'langchain'})",
+            kind="llm",
+            input_data=input_data,
+            attributes={"model": model, "provider": "langchain-chat"} if model else {"provider": "langchain-chat"},
+        )
+
     def on_llm_end(self, response: Any, run_id: str, **kwargs: Any):
         usage = {}
         model = None

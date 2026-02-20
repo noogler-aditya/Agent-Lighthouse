@@ -34,3 +34,13 @@ async def get_or_create_api_key(supabase_user_id: str) -> str:
         api_key,
     )
     return await get_api_key(supabase_user_id) or api_key
+
+
+async def get_user_id_by_api_key(api_key: str) -> Optional[str]:
+    """Reverse-lookup: resolve an API key to a supabase_user_id."""
+    pool = get_pool()
+    row = await pool.fetchrow(
+        "SELECT supabase_user_id FROM api_keys WHERE api_key = $1",
+        api_key.strip(),
+    )
+    return row["supabase_user_id"] if row else None

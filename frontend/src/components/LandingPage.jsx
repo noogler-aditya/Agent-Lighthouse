@@ -77,6 +77,7 @@ export function LandingPage({ onLoginClick }) {
                 <button type="button" className="btn btn-primary landing-btn-lg" onClick={onLoginClick}>
                   Start Debugging
                 </button>
+                <code className="landing-install-badge">$ pip install agent-lighthouse</code>
               </div>
             </div>
 
