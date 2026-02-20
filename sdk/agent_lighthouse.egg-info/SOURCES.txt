@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 agent_lighthouse/__init__.py
 agent_lighthouse/auto.py
+agent_lighthouse/cli.py
 agent_lighthouse/client.py
 agent_lighthouse/pricing.py
 agent_lighthouse/serialization.py
@@ -9,6 +10,7 @@ agent_lighthouse/tracer.py
 agent_lighthouse.egg-info/PKG-INFO
 agent_lighthouse.egg-info/SOURCES.txt
 agent_lighthouse.egg-info/dependency_links.txt
+agent_lighthouse.egg-info/entry_points.txt
 agent_lighthouse.egg-info/requires.txt
 agent_lighthouse.egg-info/top_level.txt
 tests/test_auto_instrumentation.py

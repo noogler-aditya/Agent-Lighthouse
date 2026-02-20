@@ -121,6 +121,28 @@ npm run dev
 UI requests use `Authorization: Bearer <token>` after `/api/auth/register` or `/api/auth/login`.
 Machine-to-machine SDK ingestion uses scoped `X-API-Key`.
 
+### CLI (Python-First)
+
+Install the SDK once, then use the CLI:
+
+```bash
+pip install agent-lighthouse
+agent-lighthouse init
+agent-lighthouse status
+agent-lighthouse traces --last 5
+```
+
+Power-user alias:
+
+```bash
+al status
+al traces --last 3 --json
+```
+
+Notes:
+- `init` writes `LIGHTHOUSE_API_KEY` and `LIGHTHOUSE_BASE_URL` into your project `.env`.
+- `status` and `traces` accept `--json` for machine-readable output.
+
 ### Verification Flow (Recommended)
 
 Run these checks in order after startup:

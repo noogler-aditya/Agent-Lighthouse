@@ -1,0 +1,3 @@
+[console_scripts]
+agent-lighthouse = agent_lighthouse.cli:main
+al = agent_lighthouse.cli:main
