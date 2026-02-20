@@ -21,16 +21,20 @@ SDK:
 
 ## Health Checks
 
-Run in this order:
+**Preferred method (CLI):**
+
+```bash
+agent-lighthouse status         # health + auth check
+agent-lighthouse traces --last 3  # verify data flow
+```
+
+**Manual method (curl):**
 
 ```bash
 curl http://localhost:8000/health/live
 curl http://localhost:8000/health/ready
-# First-time setup (register). If you get a 409, use /api/auth/login instead.
-TOKEN=$(curl -s http://localhost:8000/api/auth/register -H "Content-Type: application/json" -d '{"username":"demo","password":"demo"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+TOKEN=$(curl -s http://localhost:8000/api/auth/login -H "Content-Type: application/json" -d '{"username":"demo","password":"demo"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/traces
-# Optional: use the api_key returned from /api/auth/register as X-API-Key for SDK ingestion
-LIGHTHOUSE_API_KEY=local-dev-key LIGHTHOUSE_BASE_URL=http://localhost:8000 python3 sdk/examples/smoke_trace_check.py
 ```
 
 ## Incident Triage

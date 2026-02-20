@@ -1,118 +1,124 @@
 # Agent Lighthouse SDK (Python)
 
-The official Python client for instrumenting AI agents with Agent Lighthouse.
+The official Python SDK for instrumenting AI agents with [Agent Lighthouse](https://agent-lighthouse.vercel.app).
 
-## Features
-
-- **Automatic Tracing**: Decorators for agents, tools, and LLM calls.
-- **Async Support**: Fully compatible with async/await workflows.
-- **State Management**: Expose internal agent state (memory, context) for real-time inspection.
-- **Token Tracking**: Automatically capture token usage and costs from LLM responses.
+[![PyPI](https://img.shields.io/pypi/v/agent-lighthouse)](https://pypi.org/project/agent-lighthouse/)
+[![Python](https://img.shields.io/pypi/pyversions/agent-lighthouse)](https://pypi.org/project/agent-lighthouse/)
 
 ## Installation
-
-Install from PyPI:
 
 ```bash
 pip install agent-lighthouse
 ```
 
-Or install from source in development mode:
+## CLI — Zero-Config Onboarding
+
+The SDK includes a CLI for quick setup and diagnostics:
 
 ```bash
-cd sdk
-pip install -e .
+# Interactive login — writes API key to .env automatically
+agent-lighthouse init
+
+# Check backend health and auth status
+agent-lighthouse status
+
+# List recent traces from terminal
+agent-lighthouse traces --last 5
 ```
+
+Short alias: `al init`, `al status`, `al traces --last 3 --json`
 
 ## Quick Start
 
-### 1. Initialize Tracer
+### 1. Set Your API Key
 
-```python
-from agent_lighthouse import LighthouseTracer
+Run `agent-lighthouse init` (recommended), or set manually:
 
-# Use your API Key (starts with lh_)
-tracer = LighthouseTracer(api_key="lh_...")
+```bash
+export LIGHTHOUSE_API_KEY="lh_your_key_here"
 ```
 
 ### 2. Add Decorators
 
-Wrap your functions with `@trace_agent`, `@trace_tool`, or `@trace_llm`.
-
 ```python
-from agent_lighthouse import trace_agent, trace_tool, trace_llm
+from agent_lighthouse import trace_agent, trace_tool, trace_llm, get_tracer
 
 @trace_tool("Web Search")
 def search_web(query):
-    # ... logic ...
-    return results
+    return requests.get(f"https://api.search.com?q={query}").json()
 
 @trace_llm("GPT-4", model="gpt-4-turbo", cost_per_1k_prompt=0.01)
 def call_llm(prompt):
-    # ... call OpenAI ...
-    return response
+    return openai.chat.completions.create(...)
 
 @trace_agent("Researcher")
-def run_research_agent(topic):
+def research_agent(topic):
     data = search_web(topic)
     summary = call_llm(f"Summarize {data}")
     return summary
+
+# Wrap in a trace context
+tracer = get_tracer()
+with tracer.trace("Research Workflow"):
+    research_agent("AI Trends 2025")
 ```
 
 ### 3. Run It
 
-Just run your script as normal. The SDK will automatically send traces to the backend.
+Just run your script. Traces appear on the dashboard automatically.
 
-## State Inspection
+## Auto-Instrumentation
 
-Allow humans to inspect and modify agent state during execution:
-
-```python
-from agent_lighthouse import get_tracer
-
-@trace_agent("Writer")
-def writer_agent():
-    tracer = get_tracer()
-    
-    # Expose state
-    tracer.update_state(
-        memory={"draft": "Initial draft..."},
-        context={"tone": "Professional"}
-    )
-    
-    # ... execution continues ...
-```
-
-## Zero-Touch Auto-Instrumentation (Magic Import)
-
-No code changes to your LLM calls. Just import once at the top of your script:
+No decorators required — import once at the top of your script:
 
 ```python
-import agent_lighthouse.auto  # auto-instruments OpenAI, Anthropic, requests, and frameworks
+import agent_lighthouse.auto
 ```
 
-This automatically captures:
-- LLM latency
-- Token usage
-- Cost (best-effort pricing)
+This automatically instruments:
+- OpenAI and Anthropic client calls
+- HTTP requests to known LLM endpoints
+- LangChain/LangGraph, CrewAI frameworks (when installed)
 
-Content capture is **off by default**. Enable if you explicitly want payloads:
+Content capture is **off by default**:
 
 ```bash
 export LIGHTHOUSE_CAPTURE_CONTENT=true
 ```
 
-## Configuration
+## LangChain / LangGraph
 
-You can configure the SDK via environment variables:
+Pass the callback handler to capture LLM calls, chains, and tools:
+
+```python
+from agent_lighthouse.adapters.langchain import LighthouseLangChainCallbackHandler
+
+handler = LighthouseLangChainCallbackHandler()
+chain.invoke({"goal": "..."}, config={"callbacks": [handler]})
+```
+
+## State Inspection
+
+Push live state to the dashboard for real-time debugging:
+
+```python
+tracer = get_tracer()
+tracer.update_state(
+    memory={"goal": "...", "plan": plan},
+    context={"current_step": "planning"},
+    variables={"plan_length": len(plan)},
+)
+```
+
+## Configuration
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LIGHTHOUSE_API_KEY` | Your machine API key | `None` |
-| `LIGHTHOUSE_BASE_URL` | URL of the backend API | `http://localhost:8000` |
+| `LIGHTHOUSE_API_KEY` | Your API key (starts with `lh_`) | *None* |
+| `LIGHTHOUSE_BASE_URL` | Backend API URL | `https://agent-lighthouse.onrender.com` |
 | `LIGHTHOUSE_AUTO_INSTRUMENT` | Enable auto-instrumentation | `1` |
 | `LIGHTHOUSE_CAPTURE_CONTENT` | Capture request/response payloads | `false` |
-| `LIGHTHOUSE_LLM_HOSTS` | Allowlist extra LLM hosts for requests instrumentation | `""` |
+| `LIGHTHOUSE_LLM_HOSTS` | Extra LLM hosts to instrument | `""` |
 | `LIGHTHOUSE_PRICING_JSON` | Pricing override JSON string | `""` |
 | `LIGHTHOUSE_PRICING_PATH` | Pricing override JSON file path | `""` |
 | `LIGHTHOUSE_DISABLE_FRAMEWORKS` | Disable framework adapters (csv) | `""` |

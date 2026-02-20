@@ -19,11 +19,15 @@ Before cutting a release:
 
 ## Release Steps
 
-1. Create release PR that updates version references and changelog.
-2. Merge into `main` after all required checks pass.
-3. Tag release (`vX.Y.Z`) in GitHub.
-4. Publish GitHub release notes from changelog entries.
-5. Validate container images pushed by CD to GHCR.
+1. Update version in `sdk/pyproject.toml` and `sdk/agent_lighthouse/__init__.py`.
+2. Update `CHANGELOG.md` with the new version's entries.
+3. Merge into `main` after all required checks pass.
+4. Tag release (`vX.Y.Z`) — this triggers:
+   - PyPI publish via `.github/workflows/publish-sdk.yml`
+   - GitHub Release via `.github/workflows/release.yml`
+   - Docker images via `.github/workflows/cd.yml`
+5. Verify on [PyPI](https://pypi.org/project/agent-lighthouse/) that the new version is live.
+6. Validate with: `pip install --upgrade agent-lighthouse && agent-lighthouse status`
 
 ## Post-Release Validation
 

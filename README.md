@@ -5,287 +5,92 @@
 <h1 align="center">Agent Lighthouse</h1>
 
 <p align="center">
-  <strong>Multi-Agent Observability Dashboard</strong><br>
-  A framework-agnostic visual debugger for agentic AI systems
+  <strong>Multi-Agent Observability Platform</strong><br>
+  Trace execution, monitor costs, and debug state — for any AI agent framework.
 </p>
 
 <p align="center">
+  <a href="https://pypi.org/project/agent-lighthouse/"><img src="https://img.shields.io/pypi/v/agent-lighthouse" alt="PyPI"/></a>
   <img src="https://img.shields.io/badge/python-3.9+-3776ab?logo=python&logoColor=white" alt="Python"/>
   <img src="https://img.shields.io/badge/react-18+-61dafb?logo=react&logoColor=black" alt="React"/>
   <img src="https://img.shields.io/badge/fastapi-0.109+-009688?logo=fastapi&logoColor=white" alt="FastAPI"/>
-  <img src="https://img.shields.io/badge/redis-7+-dc382d?logo=redis&logoColor=white" alt="Redis"/>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License"/>
 </p>
 
 ---
 
-## 🎯 The Problem
+## Get Started in 2 Minutes
 
-When running multi-agent systems (CrewAI, LangGraph, AutoGen, etc.), debugging is a nightmare:
-
-| Challenge | Impact |
-|-----------|--------|
-| **Black Box Execution** | Can't see what's happening inside agent loops |
-| **Opaque Failures** | If it fails at step 10, which agent caused it? |
-| **Hidden Costs** | Token usage spirals without visibility |
-| **No State Inspection** | Can't pause and inspect agent memory |
-| **Log Analysis Hell** | Debugging requires parsing walls of text |
-
-## ✨ The Solution
-
-Agent Lighthouse provides a **visual debugging layer** for any multi-agent system:
-
-```
-Your Agent Code → Lighthouse SDK → Visual Dashboard
+```bash
+pip install agent-lighthouse
+agent-lighthouse init          # interactive login → writes .env
 ```
 
-### Key Features
+Then add decorators to your code:
+
+```python
+from agent_lighthouse import trace_agent, trace_tool, get_tracer
+
+@trace_agent("Researcher")
+def research(topic):
+    return search(topic)
+
+@trace_tool("Web Search")
+def search(query):
+    return duckduckgo.search(query)
+
+tracer = get_tracer()
+with tracer.trace("My Workflow"):
+    research("AI observability")
+```
+
+Traces appear on the [dashboard](https://agent-lighthouse.vercel.app) in real time.
+
+---
+
+## Why Agent Lighthouse?
+
+When running multi-agent systems (CrewAI, LangGraph, AutoGen, etc.), debugging is hard:
+
+| Challenge | What Lighthouse Gives You |
+|-----------|--------------------------|
+| Can't see inside agent loops | **Trace graph** — interactive flowchart of execution |
+| Which agent caused the failure? | **Span-level errors** with input/output data |
+| Token costs spiral without visibility | **Token monitor** — real-time cost per agent/tool |
+| Can't inspect agent memory | **State inspector** — pause, view, edit, resume |
+| Debugging requires parsing logs | **Visual dashboard** with search and filtering |
+
+---
+
+## Features
 
 | Feature | Description |
 |---------|-------------|
-| 🔍 **Trace Visualization** | Interactive flowchart showing agent execution |
-| 💰 **Token Burn-Rate Monitor** | Real-time tracking of costs per agent/tool |
-| 🔧 **State Inspection** | Pause, inspect memory as JSON, edit, and resume |
-| ⚡ **Real-Time Updates** | WebSocket-powered live updates |
-| 🔌 **Framework Agnostic** | Works with CrewAI, LangGraph, AutoGen, or custom agents |
+| 🔍 **Trace Visualization** | Interactive graph showing agent calls, tools, and LLM spans |
+| 💰 **Token Monitor** | Track token usage and costs per agent, tool, and model |
+| 🔧 **State Inspector** | Pause execution, inspect memory as JSON, edit, and resume |
+| ⚡ **Real-Time Updates** | WebSocket-powered live dashboard updates |
+| 🖥️ **CLI** | `init`, `status`, `traces` from terminal — zero browser required |
+| 🔌 **Framework Agnostic** | Works with LangChain, CrewAI, AutoGen, or plain Python |
+| 🪄 **Auto-Instrumentation** | `import agent_lighthouse.auto` — zero code changes |
 
 ---
 
-## 🖥️ Dashboard Preview
+## CLI
 
-Run the stack locally to view the dashboard at `http://localhost:5173`.
-
-**Dashboard Components:**
-- **Sidebar**: Searchable list of all traces with quick stats
-- **Trace Graph**: React Flow visualization with Agent, Tool, and LLM nodes
-- **Token Monitor**: Pie/bar charts showing cost distribution
-- **State Inspector**: Monaco editor for viewing/editing agent state
+```bash
+agent-lighthouse init              # Login + write .env
+agent-lighthouse status            # Check health + auth
+agent-lighthouse status --json     # Machine-readable output
+agent-lighthouse traces --last 5   # List recent traces
+al traces --last 3 --json          # Short alias
+```
 
 ---
 
-## 🚀 Quick Start
+## SDK Usage
 
-### Prerequisites
-
-- Python 3.9+
-- Node.js 18+
-- Redis (or Docker)
-
-### Option 1: Docker Compose (Recommended)
-
-```bash
-git clone https://github.com/noogler-aditya/Agent-Lighthouse.git
-cd Agent-Lighthouse
-
-docker-compose up -d
-```
-
-Default local API key in `docker-compose.yml`: `local-dev-key`.
-
-### Option 2: Manual Setup
-
-```bash
-# 1. Start Redis
-docker run -d -p 6379:6379 redis:7-alpine
-
-# 2. Start PostgreSQL
-docker run -d -p 5432:5432 \
-  -e POSTGRES_USER=lighthouse \
-  -e POSTGRES_PASSWORD=lighthouse \
-  -e POSTGRES_DB=lighthouse \
-  postgres:16-alpine
-
-# 3. Start Backend
-cd backend
-pip install -r requirements.txt
-export MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
-export JWT_SECRET=dev-secret
-export ALLOWED_ORIGINS=http://localhost:5173
-export DATABASE_URL=postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
-python3 -m uvicorn main:app --reload --port 8000
-
-# 4. Start Frontend (new terminal)
-cd frontend
-npm install
-npm run dev
-```
-
-### Access Points
-
-| Service | URL |
-|---------|-----|
-| **Dashboard** | http://localhost:5173 |
-| **API Docs** | http://localhost:8000/docs |
-| **WebSocket** | ws://localhost:8000/ws |
-
-UI requests use `Authorization: Bearer <token>` after `/api/auth/register` or `/api/auth/login`.
-Machine-to-machine SDK ingestion uses scoped `X-API-Key`.
-
-### CLI (Python-First)
-
-Install the SDK once, then use the CLI:
-
-```bash
-pip install agent-lighthouse
-agent-lighthouse init
-agent-lighthouse status
-agent-lighthouse traces --last 5
-```
-
-Power-user alias:
-
-```bash
-al status
-al traces --last 3 --json
-```
-
-Notes:
-- `init` writes `LIGHTHOUSE_API_KEY` and `LIGHTHOUSE_BASE_URL` into your project `.env`.
-- `status` and `traces` accept `--json` for machine-readable output.
-
-### Verification Flow (Recommended)
-
-Run these checks in order after startup:
-
-```bash
-# 1) Backend health
-curl http://localhost:8000/health/live
-curl http://localhost:8000/health/ready
-
-# 2) User auth and trace list API
-# First-time setup (register). If you get a 409, use /api/auth/login instead.
-TOKEN=$(curl -s http://localhost:8000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"demo","password":"demo"}' | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/traces
-
-# Optional: use the API key returned by /api/auth/register for SDK ingestion
-# curl -H "X-API-Key: <api_key>" http://localhost:8000/api/traces
-
-# 3) Deterministic smoke trace ingestion
-cd sdk
-LIGHTHOUSE_API_KEY=local-dev-key python3 examples/smoke_trace_check.py
-```
-
-Expected results:
-- `/health` returns JSON with `status` and Redis connectivity
-- `/api/traces` returns a `traces` array (may be empty before smoke test)
-- `smoke_trace_check.py` exits with `[PASS]` and prints a trace ID
-- Dashboard sidebar should show at least one trace after refresh
-
-### If Dashboard Is Empty
-
-Use this checklist:
-
-1. Confirm frontend auth and backend auth settings:
-   - frontend signs in via `/api/auth/register` or `/api/auth/login`
-   - backend has valid `JWT_SECRET`, `DATABASE_URL`, `ALLOWED_ORIGINS`
-2. Confirm frontend backend URL:
-   - `VITE_API_URL` should point to `http://localhost:8000`
-3. Confirm backend CORS origin:
-   - `ALLOWED_ORIGINS` includes `http://localhost:5173`
-4. Run the smoke script and verify it passes:
-   - `python3 sdk/examples/smoke_trace_check.py`
-5. Check sidebar error panel text:
-   - `401/403` means auth/session/token issue
-   - `Backend unreachable` means URL/backend availability issue
-
-## 🔐 Production Security Checklist
-
-- Set a strong `JWT_SECRET`
-- Use explicit `MACHINE_API_KEYS` scopes for SDK ingestion only
-- Configure `ALLOWED_ORIGINS` to exact trusted origins
-- Keep Redis private (no public host port mapping)
-- Run behind HTTPS/WSS
-- Rotate machine keys and monitor auth logs
-
-## 🔁 CI/CD
-
-This repo now includes GitHub Actions workflows for open-source style quality gates and delivery:
-
-- **CI** (`.github/workflows/ci.yml`)
-  - Runs on pull requests and pushes to `main`
-  - Frontend: install, lint, build, tests, dependency audit
-  - Backend: static/security checks + pytest suite + app import check
-  - SDK: multi-Python static/security checks + pytest suite (3.9-3.12)
-  - Integration: Redis + backend + SDK smoke trace ingestion test
-  - Failed pull requests are labeled/commented for follow-up (not auto-closed)
-
-- **CD** (`.github/workflows/cd.yml`)
-  - Runs on merge/push to `main`
-  - Builds and publishes Docker images to GHCR:
-    - `ghcr.io/<noogler-aditya>/<repo>/backend:latest`
-    - `ghcr.io/<noogler-aditya>/<repo>/frontend:latest`
-    - plus immutable `sha-<commit>` tags
-
-- **CodeQL** (`.github/workflows/codeql.yml`)
-  - GitHub code scanning for Python and JavaScript
-
-- **Release** (`.github/workflows/release.yml`)
-  - Creates GitHub releases automatically on `v*` tags
-
-### Recommended Repository Settings
-
-1. Protect `main` branch and require passing checks from CI before merge.
-2. Keep GitHub Packages enabled for GHCR publishing.
-3. Prefer squash merge for cleaner release history.
-4. Optionally require signed commits for maintainers.
-
----
-
-## 📚 Project Documentation
-
-Core project and community docs:
-
-- [README](README.md) - setup, architecture, and API overview
-- [CONTRIBUTING](CONTRIBUTING.md) - contribution workflow and quality gates
-- [SECURITY](SECURITY.md) - vulnerability reporting and handling
-- [SUPPORT](SUPPORT.md) - support channels and triage expectations
-- [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) - community behavior standards
-- [GOVERNANCE](GOVERNANCE.md) - decision-making and maintainer model
-- [MAINTAINERS](MAINTAINERS.md) - maintainer roles and ownership areas
-- [RELEASE](RELEASE.md) - release process and versioning policy
-- [CHANGELOG](CHANGELOG.md) - notable changes
-- [Architecture](docs/ARCHITECTURE.md) - system design details
-- [Operations Runbook](docs/OPERATIONS.md) - production operations and incident flow
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - empty dashboard and common failure recovery
-
----
-
-## 📦 SDK Installation
-
-```bash
-pip install agent-lighthouse
-```
-
-Or install from source:
-```bash
-cd sdk
-pip install -e .
-```
-
-The SDK is published on PyPI. Install it with the `pip install` command above.
-
----
-
-## 🛠️ Usage
-
-### Basic Tracing
-
-```python
-from agent_lighthouse import LighthouseTracer
-
-tracer = LighthouseTracer()
-
-with tracer.trace("My Agent Workflow"):
-    with tracer.span("Research Agent", kind="agent"):
-        result = research(query)
-    
-    with tracer.span("Writer Agent", kind="agent"):
-        content = write(result)
-```
-
-### Decorator-Based (Recommended)
+### Decorators (Recommended)
 
 ```python
 from agent_lighthouse import trace_agent, trace_tool, trace_llm, get_tracer
@@ -304,26 +109,20 @@ def research_agent(topic: str):
     analysis = call_gpt4(f"Analyze: {results}")
     return analysis
 
-# Run with tracing
 tracer = get_tracer()
 with tracer.trace("Research Workflow"):
-    research_agent("AI Trends 2024")
+    research_agent("AI Trends 2025")
 ```
 
-### Zero-Touch Auto-Instrumentation (Magic Import)
+### Auto-Instrumentation
 
-No decorators required — just import once at the top of your script:
+No decorators needed — import once at the top of your script:
 
 ```python
 import agent_lighthouse.auto
 ```
 
-This will automatically instrument:
-- OpenAI and Anthropic client calls
-- `requests.post` to known LLM endpoints
-- Frameworks like LangChain/LangGraph, CrewAI, and AutoGen (when installed)
-
-Content capture is **off by default**. Enable only if you explicitly want payloads:
+Captures OpenAI, Anthropic, and HTTP calls automatically. Content capture is off by default:
 
 ```bash
 export LIGHTHOUSE_CAPTURE_CONTENT=true
@@ -332,114 +131,123 @@ export LIGHTHOUSE_CAPTURE_CONTENT=true
 ### State Inspection
 
 ```python
-@trace_agent("Writer Agent")
-def writer_agent(research):
-    tracer = get_tracer()
-    
-    # Expose state for dashboard inspection
-    tracer.update_state(
-        memory={"research": research, "draft_count": 0},
-        context={"agent": "writer"},
-        variables={"temperature": 0.7}
-    )
-    
-    draft = generate_draft(research)
-    return draft
-```
-
-Pause from the dashboard to:
-1. View current state as JSON
-2. Edit memory/context/variables
-3. Resume execution with modified state
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Your Agent Code   │────▶│  Lighthouse SDK  │────▶│  FastAPI Backend│
-│  (CrewAI/LangGraph) │     │ (trace_agent,etc)│     │   (Port 8000)   │
-└─────────────────────┘     └──────────────────┘     └────────┬────────┘
-                                                              │
-                                                              ▼
-                            ┌──────────────────┐     ┌─────────────────┐
-                            │  React Dashboard │◀────│      Redis      │
-                            │   (Port 5173)    │     │  (Port 6379)    │
-                            └──────────────────┘     └─────────────────┘
+tracer = get_tracer()
+tracer.update_state(
+    memory={"goal": "...", "plan": plan},
+    context={"current_step": "planning"},
+    variables={"temperature": 0.7},
+)
 ```
 
 ---
 
-## 📁 Project Structure
+## Local Development
 
+### Prerequisites
+
+- Python 3.9+, Node.js 18+, Redis (or Docker)
+
+### Option 1: Docker Compose
+
+```bash
+git clone https://github.com/noogler-aditya/Agent-Lighthouse.git
+cd Agent-Lighthouse
+docker-compose up -d
 ```
-Agent-Lighthouse/
-├── backend/                    # FastAPI Backend
-│   ├── main.py                # Application entry point
-│   ├── models/                # Pydantic data models
-│   │   ├── trace.py          # Trace & Span models
-│   │   ├── agent.py          # Agent model
-│   │   ├── state.py          # State & Control models
-│   │   └── metrics.py        # Token metrics models
-│   ├── routers/               # API endpoints
-│   │   ├── traces.py         # Trace CRUD operations
-│   │   ├── agents.py         # Agent registration
-│   │   ├── state.py          # State inspection/control
-│   │   └── websocket.py      # Real-time updates
-│   └── services/              # Business logic
-│       ├── redis_service.py  # Data persistence
-│       └── connection_manager.py  # WebSocket management
-│
-├── frontend/                   # React Dashboard
-│   └── src/
-│       ├── components/
-│       │   ├── TraceGraph/   # React Flow visualization
-│       │   ├── TokenMonitor/ # Recharts cost display
-│       │   ├── StateInspector/ # Monaco JSON editor
-│       │   └── Sidebar/      # Trace list
-│       └── hooks/             # Custom React hooks
-│           ├── useWebSocket.js
-│           ├── useTraces.js
-│           └── useAgentState.js
-│
-├── sdk/                        # Python SDK
-│   └── agent_lighthouse/
-│       ├── tracer.py         # LighthouseTracer class
-│       ├── client.py         # HTTP client
-│       └── examples/         # Usage examples
-│
-├── docker-compose.yml          # Full stack deployment
-└── README.md
+
+### Option 2: Manual Setup
+
+```bash
+# Redis + Postgres
+docker run -d -p 6379:6379 redis:7-alpine
+docker run -d -p 5432:5432 \
+  -e POSTGRES_USER=lighthouse \
+  -e POSTGRES_PASSWORD=lighthouse \
+  -e POSTGRES_DB=lighthouse \
+  postgres:16-alpine
+
+# Backend
+cd backend
+pip install -r requirements.txt
+export MACHINE_API_KEYS=local-dev-key:trace:write|trace:read
+export JWT_SECRET=dev-secret
+export ALLOWED_ORIGINS=http://localhost:5173
+export DATABASE_URL=postgresql://lighthouse:lighthouse@localhost:5432/lighthouse
+python3 -m uvicorn main:app --reload --port 8000
+
+# Frontend (new terminal)
+cd frontend
+npm install
+npm run dev
 ```
+
+### Access Points
+
+| Service | URL |
+|---------|-----|
+| Dashboard | http://localhost:5173 |
+| API Docs | http://localhost:8000/docs |
+| WebSocket | ws://localhost:8000/ws |
 
 ---
 
-## 🔌 API Reference
+## API Reference
 
 ### Traces
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/traces` | GET | List all traces |
-| `/api/traces` | POST | Create new trace |
-| `/api/traces/{id}` | GET | Get trace by ID |
-| `/api/traces/{id}/tree` | GET | Get trace as tree |
-| `/api/traces/{id}/spans` | POST | Add span to trace |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/traces` | List traces (paginated, searchable) |
+| `POST` | `/api/traces` | Create a new trace |
+| `GET` | `/api/traces/:id` | Get trace details with all spans |
+| `DELETE` | `/api/traces/:id` | Delete a trace |
+| `POST` | `/api/traces/:id/complete` | Mark trace as complete |
+| `GET` | `/api/traces/:id/tree` | Get trace as hierarchical tree |
+| `GET` | `/api/traces/:id/export` | Download trace as JSON |
+| `GET` | `/api/traces/:id/metrics` | Token/cost summary |
 
-### State Control
+### Spans
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/state/{id}` | GET | Get agent state |
-| `/api/state/{id}` | PUT | Update state |
-| `/api/state/{id}/pause` | POST | Pause execution |
-| `/api/state/{id}/resume` | POST | Resume execution |
-| `/api/state/{id}/step` | POST | Step execution |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/traces/:id/spans` | Create a span |
+| `POST` | `/api/traces/:id/spans/batch` | Batch create up to 100 spans |
+| `PATCH` | `/api/traces/:id/spans/:span_id` | Update span (status, output, tokens) |
+
+### State & Execution Control
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/state/:id` | Get current state |
+| `POST` | `/api/state/:id` | Initialize state |
+| `PATCH` | `/api/state/:id` | Modify a state path |
+| `PUT` | `/api/state/:id/bulk` | Bulk update state |
+| `POST` | `/api/state/:id/pause` | Pause execution |
+| `POST` | `/api/state/:id/resume` | Resume execution |
+| `POST` | `/api/state/:id/step` | Step N then pause |
+| `POST` | `/api/state/:id/breakpoints` | Set breakpoints |
+
+### Agents
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/agents` | List registered agents |
+| `POST` | `/api/agents` | Register an agent |
+| `GET` | `/api/agents/:id` | Get agent details |
+| `GET` | `/api/agents/:id/metrics` | Agent performance metrics |
+
+### Authentication
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/register` | Create account |
+| `POST` | `/api/auth/login` | Login |
+| `POST` | `/api/auth/refresh` | Refresh token |
+| `GET` | `/api/auth/me` | Current user info |
+| `GET` | `/api/auth/api-key` | Get/create API key |
 
 ### WebSocket
 
-Connect to `/ws` for real-time updates:
 ```javascript
 const ws = new WebSocket('ws://localhost:8000/ws');
 ws.send(JSON.stringify({ action: 'subscribe', trace_id: 'xxx' }));
@@ -447,32 +255,100 @@ ws.send(JSON.stringify({ action: 'subscribe', trace_id: 'xxx' }));
 
 ---
 
-## 🧪 Run Demo
+## Architecture
 
-```bash
-cd sdk
-pip install -e .
-python examples/demo_multi_agent.py
+```
+┌──────────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Your Agent Code    │────▶│  Lighthouse SDK  │────▶│  FastAPI Backend │
+│  (Any framework)     │     │  (pip package)   │     │   (Port 8000)   │
+└──────────────────────┘     └──────────────────┘     └────────┬────────┘
+                                                               │
+                             ┌──────────────────┐     ┌────────┴────────┐
+                             │  React Dashboard │◀───▶│  Redis + Postgres│
+                             │   (Port 5173)    │     │                 │
+                             └──────────────────┘     └─────────────────┘
 ```
 
-This creates a sample workflow with Research, Writer, and Editor agents visible in the dashboard.
+## Project Structure
+
+```
+Agent-Lighthouse/
+├── backend/                    # FastAPI Backend
+│   ├── main.py                # Entry point + health endpoints
+│   ├── routers/               # API routes
+│   │   ├── traces.py         # Trace + span CRUD, batch, export
+│   │   ├── agents.py         # Agent registration + metrics
+│   │   ├── state.py          # State inspection, execution control
+│   │   ├── auth.py           # Register, login, refresh, JWT
+│   │   ├── api_keys.py       # API key issuance
+│   │   └── websocket.py      # Real-time updates
+│   ├── models/                # Pydantic data models
+│   ├── services/              # Business logic (Redis, auth)
+│   └── security.py           # Auth middleware + rate limiting
+│
+├── frontend/                   # React Dashboard
+│   └── src/
+│       ├── components/
+│       │   ├── TraceGraph/   # React Flow visualization
+│       │   ├── TokenMonitor/ # Cost distribution charts
+│       │   ├── StateInspector/ # State viewer/editor
+│       │   ├── Timeline/     # Span timeline
+│       │   ├── LandingPage.jsx
+│       │   └── DocsPage.jsx  # Full documentation page
+│       └── App.jsx            # Routing + auth
+│
+├── sdk/                        # Python SDK (PyPI: agent-lighthouse)
+│   └── agent_lighthouse/
+│       ├── __init__.py       # Public API exports
+│       ├── tracer.py         # LighthouseTracer + decorators
+│       ├── client.py         # HTTP client
+│       ├── cli.py            # CLI (init, status, traces)
+│       ├── auto.py           # Auto-instrumentation
+│       └── adapters/         # Framework adapters
+│           └── langchain.py  # LangChain/LangGraph callback handler
+│
+├── docker-compose.yml
+├── CHANGELOG.md
+└── README.md
+```
 
 ---
 
-## 🛣️ Roadmap
+## Security Checklist
 
-- [ ] **CrewAI Integration** - Auto-instrumentation for CrewAI
-- [ ] **LangGraph Integration** - Auto-instrumentation for LangGraph
-- [ ] **Breakpoints** - Set breakpoints on specific agent/tool calls
-- [ ] **Time-Travel Debugging** - Replay execution from snapshots
-- [ ] **Cost Alerts** - Notifications when burn rate exceeds threshold
-- [ ] **Export/Import** - Save and share trace data
+- Set a strong `JWT_SECRET`
+- Use explicit `MACHINE_API_KEYS` scopes for SDK ingestion
+- Configure `ALLOWED_ORIGINS` to exact trusted origins
+- Keep Redis and Postgres private
+- Run behind HTTPS/WSS
+- Rotate API keys periodically
 
 ---
 
-## 🤝 Contributing
+## CI/CD
 
-Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) first.
+| Workflow | Trigger | What It Does |
+|----------|---------|-------------|
+| CI | PRs, push to `main` | Lint, test, security scan for frontend, backend, and SDK |
+| CD | Push to `main` | Build + publish Docker images to GHCR |
+| Publish SDK | Tag `v*` | Build + publish to PyPI |
+| CodeQL | Schedule | GitHub code scanning for Python and JavaScript |
+| Release | Tag `v*` | Auto-create GitHub release |
+
+---
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) — system design and data flow
+- [Troubleshooting](docs/TROUBLESHOOTING.md) — common issues and fixes
+- [Operations Runbook](docs/OPERATIONS.md) — production operations
+- [Contributing](CONTRIBUTING.md) — contribution workflow
+- [Security](SECURITY.md) — vulnerability reporting
+- [Changelog](CHANGELOG.md) — release history
+
+---
+
+## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -480,16 +356,16 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
+
+## License
+
+MIT License — see [LICENSE](LICENSE).
 
 <p align="center">
-  <strong>Built with ❤️ for the AI Agent Community</strong>
+  <strong>Built for the AI Agent Community</strong>
 </p>
 
 <p align="center">

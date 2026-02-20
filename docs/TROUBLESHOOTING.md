@@ -1,54 +1,103 @@
 # Troubleshooting
 
-## Dashboard Shows "No traces yet"
+## Quick Diagnostic
 
-Use this sequence to determine whether it is truly empty data or a hidden error.
+Run the CLI status check first — it covers most issues:
 
-1. Verify backend health:
-   - `curl http://localhost:8000/health/live`
-   - `curl http://localhost:8000/health/ready`
-2. Verify traces endpoint:
-   - `TOKEN=$(curl -s http://localhost:8000/api/auth/register -H "Content-Type: application/json" -d '{"username":"demo","password":"demo"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")`
-   - `curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/traces`
-3. Verify frontend env:
-   - `VITE_API_URL` points to backend
-4. Verify backend env:
-   - `JWT_SECRET` and `DATABASE_URL` are set
-   - `MACHINE_API_KEYS` includes SDK scope if SDK ingestion is used
-   - `ALLOWED_ORIGINS` includes `http://localhost:5173`
+```bash
+pip install agent-lighthouse
+agent-lighthouse status
+```
 
-## `pydantic_settings` Error Parsing `allowed_origins`
+This tells you if the backend is reachable and if your API key is valid.
 
-Symptom:
+---
 
-- Backend fails at startup with `error parsing value for field "allowed_origins"`.
+## Dashboard Shows No Traces
 
-Cause:
+**Most common cause:** SDK decorators were silently dropping traces. **Fix:** Update to SDK v0.3.1+ (`pip install --upgrade agent-lighthouse`). Decorators now auto-create traces when no active context exists.
 
-- `ALLOWED_ORIGINS` value is not in expected format.
+**Full checklist:**
 
-Fix:
+1. **Verify API key is set:**
+   ```bash
+   agent-lighthouse status
+   ```
+   If auth shows "failed", run `agent-lighthouse init` to set up your key.
 
-- For local dev, set a comma-separated string:
-  - `ALLOWED_ORIGINS=http://localhost:5173`
-- In Docker/compose, ensure env value does not include malformed JSON.
+2. **Verify backend is reachable:**
+   ```bash
+   curl https://agent-lighthouse.onrender.com/health
+   ```
+   Should return `{"status": "healthy", ...}`.
+
+3. **Verify traces are being sent:**
+   ```bash
+   agent-lighthouse traces --last 5
+   ```
+   If this returns traces but the dashboard is empty, it's a frontend auth issue.
+
+4. **For local development:**
+   - `VITE_API_URL` must point to `http://localhost:8000` (not the Render URL)
+   - `ALLOWED_ORIGINS` in backend must include `http://localhost:5173`
+   - `JWT_SECRET` and `DATABASE_URL` must be set
+
+---
+
+## 403 Forbidden on SDK Calls
+
+- Ensure your API key starts with `lh_` and matches a key in the dashboard.
+- Machine API keys (set via `MACHINE_API_KEYS` env) need explicit scopes: `trace:write|trace:read`.
+- Run `agent-lighthouse status` to verify auth.
+
+---
+
+## Tokens Show as 0
+
+- **Local models (Ollama, llama.cpp):** These don't report token usage in the standard format. Pass the LangChain callback handler to extract token counts from model responses:
+  ```python
+  from agent_lighthouse.adapters.langchain import LighthouseLangChainCallbackHandler
+  handler = LighthouseLangChainCallbackHandler()
+  chain.invoke({"goal": "..."}, config={"callbacks": [handler]})
+  ```
+- **OpenAI/Anthropic:** Use `import agent_lighthouse.auto` at the top of your script for automatic token capture.
+
+---
+
+## Auto-Instrumentation Not Working
+
+- `import agent_lighthouse.auto` must be the **very first import** in your application, before any OpenAI/Anthropic/httpx imports.
+- Verify it's enabled: `LIGHTHOUSE_AUTO_INSTRUMENT=1` (default).
+
+---
+
+## `pydantic_settings` Error at Backend Startup
+
+**Symptom:** `error parsing value for field "allowed_origins"`
+
+**Fix:** Set `ALLOWED_ORIGINS` as a simple comma-separated string:
+```bash
+ALLOWED_ORIGINS=http://localhost:5173,https://agent-lighthouse.vercel.app
+```
+
+---
 
 ## Smoke Script Fails
 
-Run:
-
 ```bash
-LIGHTHOUSE_API_KEY=local-dev-key LIGHTHOUSE_BASE_URL=http://localhost:8000 python3 sdk/examples/smoke_trace_check.py
+LIGHTHOUSE_API_KEY=local-dev-key LIGHTHOUSE_BASE_URL=http://localhost:8000 \
+  python3 sdk/examples/smoke_trace_check.py
 ```
 
 If it fails:
+- Confirm backend is running on the same URL.
+- Confirm `LIGHTHOUSE_API_KEY` matches a key in `MACHINE_API_KEYS`.
+- Check backend logs for auth or Redis errors.
 
-- confirm backend is running on the same URL
-- confirm machine key in `LIGHTHOUSE_API_KEY` is present in `MACHINE_API_KEYS`
-- inspect backend logs for auth/Redis errors
+---
 
 ## CI Fails on Pull Request
 
-- Open failed job logs in Actions.
-- Fix the specific failing stage (frontend, backend, sdk, or integration).
-- Push new commits; CI will re-run automatically.
+- Open the failed job logs in GitHub Actions.
+- Fix the specific failing stage (frontend, backend, SDK, or integration).
+- Push new commits — CI re-runs automatically.

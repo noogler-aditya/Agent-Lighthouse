@@ -50,13 +50,23 @@ npm run preview
 
 ## Project Structure
 
-- `src/components/TraceGraph`: React Flow graph visualization
-- `src/components/TokenMonitor`: Token usage and cost charts
-- `src/components/StateInspector`: JSON editor for agent state
-- `src/components/Sidebar`: Trace list and filtering
+- `src/components/TraceGraph/` — React Flow graph visualization
+- `src/components/TokenMonitor/` — Token usage and cost charts
+- `src/components/StateInspector/` — JSON editor for agent state
+- `src/components/Timeline/` — Span timeline view
+- `src/components/LandingPage.jsx` — Marketing landing page
+- `src/components/DocsPage.jsx` — Full documentation page with API reference
+- `src/App.jsx` — Routing, auth, and layout
 
 ## Key Features
 
-- **Real-time Updates**: Uses WebSockets to stream span events.
-- **Interactive Graph**: Click nodes to see details.
-- **State Control**: Pause, resume, and modify agent state on the fly.
+- **Real-time Updates**: WebSocket-powered live span streaming
+- **Interactive Graph**: Click nodes to see span details, inputs, outputs
+- **State Control**: Pause, resume, and modify agent state from the UI
+- **Responsive**: Works on desktop, tablet, and mobile
+
+## Deployment
+
+- **Vercel** (recommended): connect the repo, set `VITE_API_URL` env var
+- **Docker**: `docker build -t lighthouse-frontend .`
+
