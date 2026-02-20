@@ -44,7 +44,7 @@ export function LandingPage({ onLoginClick }) {
   return (
     <div className="landing-page">
       <header className="landing-nav-wrap">
-        <nav className="landing-nav" aria-label="Primary">
+        <nav className="landing-nav landing-container" aria-label="Primary">
           <div className="landing-brand">
             <div className="landing-brand-logo" aria-hidden="true">
               <Bot className="ui-icon" />
@@ -61,85 +61,101 @@ export function LandingPage({ onLoginClick }) {
       </header>
 
       <main className="landing-main">
-        <section className="landing-hero" aria-labelledby="landing-title">
-          <div className="landing-hero-copy" data-animate="enter" data-delay="1">
-            <p className="landing-eyebrow">Open-source agent observability</p>
-            <h1 id="landing-title" className="landing-title">
-              Debug AI agent systems with full execution visibility
-            </h1>
-            <p className="landing-subtitle">
-              Agent Lighthouse helps teams trace calls, inspect state transitions, and monitor token usage
-              so failures are diagnosable before they become incidents.
-            </p>
+        <section className="landing-section landing-hero-section" aria-labelledby="landing-title">
+          <div className="landing-container landing-hero">
+            <div className="landing-hero-copy" data-animate="enter" data-delay="1">
+              <p className="landing-eyebrow">Open-source agent observability</p>
+              <h1 id="landing-title" className="landing-title">
+                Debug AI agent systems with full execution visibility
+              </h1>
+              <p className="landing-subtitle">
+                Agent Lighthouse helps teams trace calls, inspect state transitions, and monitor token usage
+                so failures are diagnosable before they become incidents.
+              </p>
 
-            <div className="landing-hero-actions">
-              <button type="button" className="btn btn-primary landing-btn-lg" onClick={onLoginClick}>
-                Start Debugging
-              </button>
-              <code className="landing-install-badge">$ pip install agent-lighthouse</code>
+              <div className="landing-hero-actions">
+                <button type="button" className="btn btn-primary landing-btn-lg" onClick={onLoginClick}>
+                  Start Debugging
+                </button>
+                <code className="landing-install-badge">$ pip install agent-lighthouse</code>
+              </div>
             </div>
-          </div>
 
-          <aside className="landing-hero-visual" aria-hidden="true" data-animate="enter" data-delay="2">
-            <div className="landing-radar-shell">
-              <div className="landing-radar-sweep" />
-              <div className="landing-radar-glow" />
-              <Radar className="landing-radar-icon" />
-              <div className="landing-radar-ring ring-one" />
-              <div className="landing-radar-ring ring-two" />
-              <div className="landing-radar-ring ring-three" />
-            </div>
-            <div className="landing-visual-stat">
-              <span>Trace graph</span>
-              <strong>Live span events</strong>
-            </div>
-          </aside>
-        </section>
-
-        <section className="landing-feature-section" aria-labelledby="features-title">
-          <h2 id="features-title" className="landing-section-title">Core capabilities</h2>
-          <div className="landing-feature-grid">
-            {featureCards.map(({ title, description, icon, tone }) => (
-              <article key={title} className="landing-feature-card" data-animate="enter" data-delay="2">
-                <div className={`landing-feature-icon ${tone}`} aria-hidden="true">
-                  {icon}
-                </div>
-                <h3>{title}</h3>
-                <p>{description}</p>
-              </article>
-            ))}
+            <aside className="landing-hero-visual" aria-hidden="true" data-animate="enter" data-delay="2">
+              <div className="landing-radar-shell">
+                <div className="landing-radar-sweep" />
+                <div className="landing-radar-glow" />
+                <Radar className="landing-radar-icon" />
+                <div className="landing-radar-ring ring-one" />
+                <div className="landing-radar-ring ring-two" />
+                <div className="landing-radar-ring ring-three" />
+              </div>
+              <div className="landing-visual-stat">
+                <span>Trace graph</span>
+                <strong>Live span events</strong>
+              </div>
+            </aside>
           </div>
         </section>
 
-        <section className="landing-steps-section" aria-labelledby="steps-title">
-          <h2 id="steps-title" className="landing-section-title">How it works</h2>
-          <div className="landing-steps-grid">
-            {workflowSteps.map((step, index) => (
-              <article key={step.title} className="landing-step-card" data-animate="enter" data-delay="3">
-                <span className="landing-step-index" aria-hidden="true">{index + 1}</span>
-                <h3>{step.title}</h3>
-                <p>{step.description}</p>
-              </article>
-            ))}
+        <section className="landing-section landing-feature-section" aria-labelledby="features-title">
+          <div className="landing-container">
+            <div className="landing-section-header" data-animate="enter" data-delay="1">
+              <p className="landing-section-eyebrow">Capabilities</p>
+              <h2 id="features-title" className="landing-section-title">Core capabilities</h2>
+            </div>
+            <div className="landing-feature-grid">
+              {featureCards.map(({ title, description, icon, tone }) => (
+                <article key={title} className="landing-feature-card" data-animate="enter" data-delay="2">
+                  <div className={`landing-feature-icon ${tone}`} aria-hidden="true">
+                    {icon}
+                  </div>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="landing-cta-band" aria-labelledby="cta-title" data-animate="enter" data-delay="3">
-          <div>
-            <h2 id="cta-title">Ship reliable multi-agent workflows with clearer diagnostics</h2>
-            <p>Use Agent Lighthouse to inspect behavior, reduce debugging time, and improve runtime confidence.</p>
+        <section className="landing-section landing-steps-section" aria-labelledby="steps-title">
+          <div className="landing-container">
+            <div className="landing-section-header" data-animate="enter" data-delay="1">
+              <p className="landing-section-eyebrow">Workflow</p>
+              <h2 id="steps-title" className="landing-section-title">How it works</h2>
+            </div>
+            <div className="landing-steps-grid">
+              {workflowSteps.map((step, index) => (
+                <article key={step.title} className="landing-step-card" data-animate="enter" data-delay="3">
+                  <span className="landing-step-index" aria-hidden="true">{index + 1}</span>
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
+                </article>
+              ))}
+            </div>
           </div>
-          <button type="button" className="btn btn-primary landing-btn-lg" onClick={onLoginClick}>
-            Sign In to Continue
-          </button>
+        </section>
+
+        <section className="landing-section landing-cta-section" aria-labelledby="cta-title" data-animate="enter" data-delay="3">
+          <div className="landing-container landing-cta-band">
+            <div>
+              <h2 id="cta-title">Ship reliable multi-agent workflows with clearer diagnostics</h2>
+              <p>Use Agent Lighthouse to inspect behavior, reduce debugging time, and improve runtime confidence.</p>
+            </div>
+            <button type="button" className="btn btn-primary landing-btn-lg" onClick={onLoginClick}>
+              Sign In to Continue
+            </button>
+          </div>
         </section>
       </main>
 
       <footer className="landing-footer">
-        <p>MIT licensed. Built for production debugging workflows.</p>
-        <div className="landing-footer-links">
-          <a href={REPO_URL} target="_blank" rel="noreferrer">Repository</a>
-          <Link to="/docs">Documentation</Link>
+        <div className="landing-container landing-footer-inner">
+          <p>MIT licensed. Built for production debugging workflows.</p>
+          <div className="landing-footer-links">
+            <a href={REPO_URL} target="_blank" rel="noreferrer">Repository</a>
+            <Link to="/docs">Documentation</Link>
+          </div>
         </div>
       </footer>
     </div>
