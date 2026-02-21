@@ -5,7 +5,7 @@ uvicorn[standard]==0.27.1
 python-multipart==0.0.22
 
 # Redis
-redis==7.1.0
+redis==7.1.1
 
 # PostgreSQL
 asyncpg>=0.29.0
